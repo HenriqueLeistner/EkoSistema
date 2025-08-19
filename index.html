@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ekobrazil - Sistema de Clientes</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="logo-container">
+                <h1 class="title-text">🌿 Ekobrazil - Dados de Clientes</h1>
+            </div>
+            <p class="subtitle-text">Inteligência Ecológica - Sistema de Gestão de Clientes</p>
+            
+            <!-- User info and logout -->
+            <div class="user-info">
+                <span id="welcomeUser">Bem-vindo, Usuário</span>
+                <button id="logoutBtn" class="logout-btn">Sair</button>
+            </div>
+        </header>
+
+        <!-- Logo -->
+        <div class="logo-section">
+            <img src="logo.png" alt="Ekobrazil Logo" class="logo-image">
+        </div>
+
+        <!-- Success Message -->
+        <div class="success-message" id="successMessage">
+            <h4>✅ Dados carregados com sucesso!</h4>
+            <p id="totalClients">359 clientes encontrados na base de dados Ekobrazil</p>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="filter-section">
+            <h3 class="filter-title">🔍 Filtros e Pesquisa</h3>
+            
+            <div class="filter-controls">
+                <div class="filter-group">
+                    <label for="searchInput">Pesquisar por nome:</label>
+                    <input type="text" id="searchInput" placeholder="Digite o nome do cliente..." class="search-input">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="timeFilter">Filtrar por última compra:</label>
+                    <select id="timeFilter" class="time-filter">
+                        <option value="todos">Todos</option>
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="60">31-60 dias</option>
+                        <option value="90">61-90 dias</option>
+                        <option value="90+">Mais de 90 dias</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="sortOption">Ordenar por:</label>
+                    <select id="sortOption" class="sort-option">
+                        <option value="nome">Nome</option>
+                        <option value="data">Data da Última Compra</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-section">
+            <h3>📊 Resumo dos Dados</h3>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h2 id="totalMetric">359</h2>
+                    <p>Total de Clientes</p>
+                </div>
+                <div class="metric-card">
+                    <h2 id="filteredMetric">359</h2>
+                    <p>Filtrados</p>
+                </div>
+                <div class="metric-card">
+                    <h2 id="phoneMetric">359</h2>
+                    <p>Com Telefone</p>
+                </div>
+                <div class="metric-card">
+                    <h2 id="dateMetric">359</h2>
+                    <p>Com Data de Compra</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Info -->
+        <div class="filter-info" id="filterInfo" style="display: none;">
+            <p id="filterInfoText">📋 Mostrando resultados filtrados</p>
+        </div>
+
+        <!-- Data Table Section -->
+        <div class="table-section">
+            <h3>📋 Dados dos Clientes Ekobrazil</h3>
+            <hr class="divider">
+            
+            <div class="table-container">
+                <table id="clientsTable" class="clients-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Telefone</th>
+                            <th>Data da Última Compra</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Data will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Loading indicator -->
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                <p>Carregando dados...</p>
+            </div>
+
+            <!-- No results message -->
+            <div class="no-results" id="noResults" style="display: none;">
+                <p>🔍 Nenhum cliente encontrado com os critérios selecionados.</p>
+            </div>
+
+            <!-- Download button -->
+            <div class="download-section">
+                <button id="downloadBtn" class="download-btn">
+                    🌿 Baixar dados Ekobrazil (CSV)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
