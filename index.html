@@ -41,7 +41,7 @@
                 <button class="tab-button" data-tab="orders-data">🛒 Dados de Pedidos</button>
                 <button class="tab-button" data-tab="customer-list">📋 Lista de Clientes</button>
                 <button class="tab-button" data-tab="sales-analysis">📅 Pedidos por Período</button>
-                <button class="tab-button" data-tab="add-data">➕ Adicionar Dados</button>
+                <button class="tab-button" data-tab="customer-recurrence">🔄 Recorrência de Compradores</button>
             </div>
         </div>
 
@@ -245,199 +245,82 @@
             </div>
         </div>
 
-        <div id="add-data" class="tab-content">
+        <div id="customer-recurrence" class="tab-content">
             <div class="filter-section">
-                <h3 class="filter-title">➕ Adicionar Novos Dados</h3>
-                <div class="form-tabs">
-                    <button class="form-tab-button active" data-form="customer-form">👤 Novo Cliente</button>
-                    <button class="form-tab-button" data-form="order-form">🛒 Novo Pedido</button>
+                <h3 class="filter-title">🔄 Filtros - Recorrência de Compradores</h3>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label for="recurrenceSearchInput">Pesquisar por nome/email:</label>
+                        <input type="text" id="recurrenceSearchInput" placeholder="Digite o nome ou email..." class="search-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="recurrencePeriodFilter">Período da última compra:</label>
+                        <select id="recurrencePeriodFilter" class="period-filter">
+                            <option value="todos">Todos os Períodos</option>
+                            <option value="1-30">Entre 1 e 30 dias</option>
+                            <option value="31-60">Entre 31 e 60 dias</option>
+                            <option value="61-90">Entre 61 e 90 dias</option>
+                            <option value="90+">Mais de 90 dias</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="recurrenceStateFilter">Estado:</label>
+                        <select id="recurrenceStateFilter" class="state-filter">
+                            <option value="todos">Todos os Estados</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="minPurchasesFilter">Mínimo de compras:</label>
+                        <input type="number" id="minPurchasesFilter" min="1" value="1" class="number-input">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metrics-section">
+                <h3>📊 Estatísticas de Recorrência</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h2 id="recurrence1to30DaysMetric">0</h2>
+                        <p>Entre 1-30 dias</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="recurrence31to60DaysMetric">0</h2>
+                        <p>Entre 31-60 dias</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="recurrence61to90DaysMetric">0</h2>
+                        <p>Entre 61-90 dias</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="recurrence90PlusMetric">0</h2>
+                        <p>Mais de 90 dias</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Formulário de Novo Cliente -->
-            <div id="customer-form" class="form-content active">
-                <div class="metrics-section">
-                    <h3>👤 Cadastro de Novo Cliente</h3>
-                    <form id="newCustomerForm" class="data-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerName">Nome *</label>
-                                <input type="text" id="customerName" name="customerName" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="customerEmail">Email *</label>
-                                <input type="email" id="customerEmail" name="customerEmail" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerPhone">Telefone</label>
-                                <input type="tel" id="customerPhone" name="customerPhone" placeholder="(11) 99999-9999">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerCPF">CPF/CNPJ</label>
-                                <input type="text" id="customerCPF" name="customerCPF" placeholder="000.000.000-00">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerAddress">Endereço</label>
-                                <input type="text" id="customerAddress" name="customerAddress">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerNumber">Número</label>
-                                <input type="text" id="customerNumber" name="customerNumber">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="customerCity">Cidade</label>
-                                <input type="text" id="customerCity" name="customerCity">
-                            </div>
-                            <div class="form-group">
-                                <label for="customerState">Estado</label>
-                                <select id="customerState" name="customerState">
-                                    <option value="">Selecione</option>
-                                    <option value="AC">Acre</option>
-                                    <option value="AL">Alagoas</option>
-                                    <option value="AP">Amapá</option>
-                                    <option value="AM">Amazonas</option>
-                                    <option value="BA">Bahia</option>
-                                    <option value="CE">Ceará</option>
-                                    <option value="DF">Distrito Federal</option>
-                                    <option value="ES">Espírito Santo</option>
-                                    <option value="GO">Goiás</option>
-                                    <option value="MA">Maranhão</option>
-                                    <option value="MT">Mato Grosso</option>
-                                    <option value="MS">Mato Grosso do Sul</option>
-                                    <option value="MG">Minas Gerais</option>
-                                    <option value="PA">Pará</option>
-                                    <option value="PB">Paraíba</option>
-                                    <option value="PR">Paraná</option>
-                                    <option value="PE">Pernambuco</option>
-                                    <option value="PI">Piauí</option>
-                                    <option value="RJ">Rio de Janeiro</option>
-                                    <option value="RN">Rio Grande do Norte</option>
-                                    <option value="RS">Rio Grande do Sul</option>
-                                    <option value="RO">Rondônia</option>
-                                    <option value="RR">Roraima</option>
-                                    <option value="SC">Santa Catarina</option>
-                                    <option value="SP">São Paulo</option>
-                                    <option value="SE">Sergipe</option>
-                                    <option value="TO">Tocantins</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="submit-btn">💾 Salvar Cliente</button>
-                            <button type="reset" class="reset-btn">🔄 Limpar Formulário</button>
-                        </div>
-                    </form>
+            <div class="analysis-section">
+                <h4>📈 Análise de Comportamento</h4>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h2 id="avgDaysBetweenPurchasesMetric">0</h2>
+                        <p>Dias médios entre compras</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="totalRecurrentCustomersMetric">0</h2>
+                        <p>Clientes Recorrentes</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="recurrentValueMetric">R$ 0,00</h2>
+                        <p>Valor de Recorrentes</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="recurrenceRateMetric">0%</h2>
+                        <p>Taxa de Recorrência</p>
+                    </div>
                 </div>
             </div>
-
-            <!-- Formulário de Novo Pedido -->
-            <div id="order-form" class="form-content">
-                <div class="metrics-section">
-                    <h3>🛒 Cadastro de Novo Pedido</h3>
-                    <form id="newOrderForm" class="data-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="orderCustomerEmail">Email do Cliente *</label>
-                                <input type="email" id="orderCustomerEmail" name="orderCustomerEmail" required placeholder="cliente@email.com">
-                            </div>
-                            <div class="form-group">
-                                <label for="orderNumber">Número do Pedido *</label>
-                                <input type="text" id="orderNumber" name="orderNumber" required placeholder="123456">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="orderValue">Valor Total *</label>
-                                <input type="number" id="orderValue" name="orderValue" step="0.01" min="0" required placeholder="0.00">
-                            </div>
-                            <div class="form-group">
-                                <label for="orderStatus">Status do Pedido *</label>
-                                <select id="orderStatus" name="orderStatus" required>
-                                    <option value="">Selecione</option>
-                                    <option value="Aguardando Pagamento">Aguardando Pagamento</option>
-                                    <option value="Pago">Pago</option>
-                                    <option value="Aprovado">Aprovado</option>
-                                    <option value="Em Processamento">Em Processamento</option>
-                                    <option value="Enviado">Enviado</option>
-                                    <option value="Entregue">Entregue</option>
-                                    <option value="Cancelado">Cancelado</option>
-                                    <option value="Devolvido">Devolvido</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="orderPayment">Forma de Pagamento</label>
-                                <select id="orderPayment" name="orderPayment">
-                                    <option value="">Selecione</option>
-                                    <option value="Cartão de Crédito">Cartão de Crédito</option>
-                                    <option value="Cartão de Débito">Cartão de Débito</option>
-                                    <option value="PIX">PIX</option>
-                                    <option value="Boleto">Boleto</option>
-                                    <option value="Transferência">Transferência</option>
-                                    <option value="Dinheiro">Dinheiro</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="orderDate">Data do Pedido</label>
-                                <input type="date" id="orderDate" name="orderDate">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="orderDeliveryCity">Cidade de Entrega</label>
-                                <input type="text" id="orderDeliveryCity" name="orderDeliveryCity">
-                            </div>
-                            <div class="form-group">
-                                <label for="orderDeliveryState">Estado de Entrega</label>
-                                <select id="orderDeliveryState" name="orderDeliveryState">
-                                    <option value="">Selecione</option>
-                                    <option value="AC">Acre</option>
-                                    <option value="AL">Alagoas</option>
-                                    <option value="AP">Amapá</option>
-                                    <option value="AM">Amazonas</option>
-                                    <option value="BA">Bahia</option>
-                                    <option value="CE">Ceará</option>
-                                    <option value="DF">Distrito Federal</option>
-                                    <option value="ES">Espírito Santo</option>
-                                    <option value="GO">Goiás</option>
-                                    <option value="MA">Maranhão</option>
-                                    <option value="MT">Mato Grosso</option>
-                                    <option value="MS">Mato Grosso do Sul</option>
-                                    <option value="MG">Minas Gerais</option>
-                                    <option value="PA">Pará</option>
-                                    <option value="PB">Paraíba</option>
-                                    <option value="PR">Paraná</option>
-                                    <option value="PE">Pernambuco</option>
-                                    <option value="PI">Piauí</option>
-                                    <option value="RJ">Rio de Janeiro</option>
-                                    <option value="RN">Rio Grande do Norte</option>
-                                    <option value="RS">Rio Grande do Sul</option>
-                                    <option value="RO">Rondônia</option>
-                                    <option value="RR">Roraima</option>
-                                    <option value="SC">Santa Catarina</option>
-                                    <option value="SP">São Paulo</option>
-                                    <option value="SE">Sergipe</option>
-                                    <option value="TO">Tocantins</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="submit-btn">💾 Salvar Pedido</button>
-                            <button type="reset" class="reset-btn">🔄 Limpar Formulário</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Mensagens de Resultado -->
-            <div id="formMessages" class="form-messages"></div>
+            
+            <div id="customerRecurrenceTable" class="table-container"></div>
         </div>
 
         <!-- Data Display Controls -->

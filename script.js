@@ -121,6 +121,7 @@ class EkobrazilIntegratedSystem {
         this.setupOrdersFilters();
         this.setupCustomerListFilters();
         this.setupPeriodFilters();
+        this.setupRecurrenceFilters();
     }
 
     setupCustomerSummaryFilters() {
@@ -195,6 +196,26 @@ class EkobrazilIntegratedSystem {
 
         // Set default dates
         this.setDefaultDates();
+    }
+
+    setupRecurrenceFilters() {
+        const searchInput = document.getElementById('recurrenceSearchInput');
+        const periodFilter = document.getElementById('recurrencePeriodFilter');
+        const stateFilter = document.getElementById('recurrenceStateFilter');
+        const minPurchasesFilter = document.getElementById('minPurchasesFilter');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', () => this.filterRecurrence());
+        }
+        if (periodFilter) {
+            periodFilter.addEventListener('change', () => this.filterRecurrence());
+        }
+        if (stateFilter) {
+            stateFilter.addEventListener('change', () => this.filterRecurrence());
+        }
+        if (minPurchasesFilter) {
+            minPurchasesFilter.addEventListener('input', () => this.filterRecurrence());
+        }
     }
 
     populateFilters() {
@@ -272,6 +293,21 @@ class EkobrazilIntegratedSystem {
                 periodStatusFilter.appendChild(option);
             });
         }
+
+        // Populate recurrence state filter
+        const recurrenceStateFilter = document.getElementById('recurrenceStateFilter');
+        if (recurrenceStateFilter && this.data.customerStats) {
+            const states = [...new Set(this.data.customerStats
+                .map(c => c.ENDERECO_ESTADO)
+                .filter(s => s))].sort();
+            
+            states.forEach(state => {
+                const option = document.createElement('option');
+                option.value = state;
+                option.textContent = state;
+                recurrenceStateFilter.appendChild(option);
+            });
+        }
     }
 
     switchTab(tabId) {
@@ -305,8 +341,8 @@ class EkobrazilIntegratedSystem {
             case 'sales-analysis':
                 this.renderPeriodAnalysis();
                 break;
-            case 'add-data':
-                this.setupAddDataTab();
+            case 'customer-recurrence':
+                this.renderCustomerRecurrence();
                 break;
         }
     }
@@ -1216,6 +1252,245 @@ class EkobrazilIntegratedSystem {
         } catch (error) {
             console.error('Erro ao carregar dados salvos:', error);
         }
+    }
+
+    renderCustomerRecurrence() {
+        console.log('Renderizando análise de recorrência...');
+        this.calculateRecurrenceMetrics();
+        this.filterRecurrence();
+    }
+
+    calculateRecurrenceMetrics() {
+        const now = new Date();
+        const customerStats = this.data.customerStats || [];
+        const orders = this.data.orders || [];
+
+        // Criar mapa de últimas compras por cliente
+        const customerLastPurchase = new Map();
+        
+        orders.forEach(order => {
+            const orderDate = this.parseDate(order.PEDIDO_DATA_CRIACAO);
+            if (orderDate) {
+                const email = order.CLIENTE_EMAIL;
+                if (!customerLastPurchase.has(email) || orderDate > customerLastPurchase.get(email)) {
+                    customerLastPurchase.set(email, orderDate);
+                }
+            }
+        });
+
+        // Calcular estatísticas por período
+        let count1to30Days = 0, count31to60Days = 0, count61to90Days = 0, count90Plus = 0;
+        let totalDaysBetweenPurchases = 0, totalCustomersWithMultiplePurchases = 0;
+        let totalRecurrentValue = 0;
+
+        customerStats.forEach(customer => {
+            const email = customer.CLIENTE_EMAIL;
+            const lastPurchaseDate = customerLastPurchase.get(email);
+            
+            if (lastPurchaseDate) {
+                const daysSinceLastPurchase = Math.floor((now - lastPurchaseDate) / (1000 * 60 * 60 * 24));
+                const purchaseCount = parseInt(customer.PEDIDOS) || 0;
+                
+                if (purchaseCount > 1) {
+                    totalCustomersWithMultiplePurchases++;
+                    totalDaysBetweenPurchases += daysSinceLastPurchase;
+                    totalRecurrentValue += this.parseValue(customer.VALOR_PEDIDOS_TOTAL);
+                }
+
+                if (daysSinceLastPurchase >= 1 && daysSinceLastPurchase <= 30) {
+                    count1to30Days++;
+                } else if (daysSinceLastPurchase >= 31 && daysSinceLastPurchase <= 60) {
+                    count31to60Days++;
+                } else if (daysSinceLastPurchase >= 61 && daysSinceLastPurchase <= 90) {
+                    count61to90Days++;
+                } else if (daysSinceLastPurchase > 90) {
+                    count90Plus++;
+                }
+            }
+        });
+
+        const avgDaysBetweenPurchases = totalCustomersWithMultiplePurchases > 0 ? 
+            Math.round(totalDaysBetweenPurchases / totalCustomersWithMultiplePurchases) : 0;
+        
+        const recurrenceRate = customerStats.length > 0 ? 
+            Math.round((totalCustomersWithMultiplePurchases / customerStats.length) * 100) : 0;
+
+        // Atualizar métricas na interface
+        this.updateElement('recurrence1to30DaysMetric', count1to30Days);
+        this.updateElement('recurrence31to60DaysMetric', count31to60Days);
+        this.updateElement('recurrence61to90DaysMetric', count61to90Days);
+        this.updateElement('recurrence90PlusMetric', count90Plus);
+        this.updateElement('avgDaysBetweenPurchasesMetric', avgDaysBetweenPurchases);
+        this.updateElement('totalRecurrentCustomersMetric', totalCustomersWithMultiplePurchases);
+        this.updateElement('recurrentValueMetric', this.formatCurrency(totalRecurrentValue));
+        this.updateElement('recurrenceRateMetric', `${recurrenceRate}%`);
+    }
+
+    filterRecurrence() {
+        const searchTerm = document.getElementById('recurrenceSearchInput')?.value.toLowerCase() || '';
+        const periodFilter = document.getElementById('recurrencePeriodFilter')?.value || 'todos';
+        const stateFilter = document.getElementById('recurrenceStateFilter')?.value || 'todos';
+        const minPurchases = parseInt(document.getElementById('minPurchasesFilter')?.value) || 1;
+
+        const now = new Date();
+        const orders = this.data.orders || [];
+        
+        // Criar mapa de últimas compras por cliente
+        const customerLastPurchase = new Map();
+        orders.forEach(order => {
+            const orderDate = this.parseDate(order.PEDIDO_DATA_CRIACAO);
+            if (orderDate) {
+                const email = order.CLIENTE_EMAIL;
+                if (!customerLastPurchase.has(email) || orderDate > customerLastPurchase.get(email)) {
+                    customerLastPurchase.set(email, orderDate);
+                }
+            }
+        });
+
+        let filteredData = (this.data.customerStats || []).filter(customer => {
+            // Filtro de texto
+            if (searchTerm) {
+                const nameMatch = customer.CLIENTE_NOME?.toLowerCase().includes(searchTerm);
+                const emailMatch = customer.CLIENTE_EMAIL?.toLowerCase().includes(searchTerm);
+                if (!nameMatch && !emailMatch) return false;
+            }
+
+            // Filtro de estado
+            if (stateFilter !== 'todos' && customer.ENDERECO_ESTADO !== stateFilter) {
+                return false;
+            }
+
+            // Filtro de mínimo de compras
+            const purchaseCount = parseInt(customer.PEDIDOS) || 0;
+            if (purchaseCount < minPurchases) {
+                return false;
+            }
+
+            // Filtro de período
+            if (periodFilter !== 'todos') {
+                const lastPurchaseDate = customerLastPurchase.get(customer.CLIENTE_EMAIL);
+                if (!lastPurchaseDate) return false;
+
+                const daysSinceLastPurchase = Math.floor((now - lastPurchaseDate) / (1000 * 60 * 60 * 24));
+
+                switch (periodFilter) {
+                    case '1-30':
+                        return daysSinceLastPurchase >= 1 && daysSinceLastPurchase <= 30;
+                    case '31-60':
+                        return daysSinceLastPurchase >= 31 && daysSinceLastPurchase <= 60;
+                    case '61-90':
+                        return daysSinceLastPurchase >= 61 && daysSinceLastPurchase <= 90;
+                    case '90+':
+                        return daysSinceLastPurchase > 90;
+                    default:
+                        return true;
+                }
+            }
+
+            return true;
+        });
+
+        // Adicionar informação de última compra aos dados filtrados
+        filteredData = filteredData.map(customer => {
+            const lastPurchaseDate = customerLastPurchase.get(customer.CLIENTE_EMAIL);
+            const daysSinceLastPurchase = lastPurchaseDate ? 
+                Math.floor((now - lastPurchaseDate) / (1000 * 60 * 60 * 24)) : null;
+            
+            return {
+                ...customer,
+                ULTIMA_COMPRA: lastPurchaseDate ? this.formatDate(lastPurchaseDate) : 'Nunca',
+                DIAS_ULTIMA_COMPRA: daysSinceLastPurchase || 0
+            };
+        });
+
+        this.renderRecurrenceTable(filteredData);
+    }
+
+    renderRecurrenceTable(data) {
+        const container = document.getElementById('customerRecurrenceTable');
+        if (!container) return;
+
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p class="no-data">Nenhum cliente encontrado com os filtros aplicados.</p>';
+            return;
+        }
+
+        const headers = [
+            'Nome', 'Email', 'Telefone', 'WhatsApp', 'Total de Pedidos', 'Valor Total', 
+            'Última Compra', 'Dias desde última compra', 'Estado'
+        ];
+
+        let tableHTML = `
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        data.forEach(customer => {
+            const phone = this.formatPhone(customer.CLIENTE_TELEFONE_CELULAR);
+            const totalValue = this.formatCurrency(this.parseValue(customer.VALOR_PEDIDOS_TOTAL));
+            const daysSince = customer.DIAS_ULTIMA_COMPRA;
+            
+            // Preparar número para WhatsApp (apenas dígitos)
+            const phoneNumber = customer.CLIENTE_TELEFONE_CELULAR;
+            const whatsappNumber = phoneNumber ? phoneNumber.toString().replace(/\D/g, '') : '';
+            const whatsappButton = whatsappNumber ? 
+                `<button class="whatsapp-btn" onclick="window.open('https://wa.me/55${whatsappNumber}', '_blank')" title="Enviar mensagem no WhatsApp">
+                    📱 WhatsApp
+                </button>` : 
+                '<span class="no-phone">-</span>';
+            
+            // Colorir baseado no período
+            let rowClass = '';
+            if (daysSince >= 1 && daysSince <= 30) rowClass = 'recent-purchase';
+            else if (daysSince >= 31 && daysSince <= 60) rowClass = 'medium-purchase';
+            else if (daysSince >= 61 && daysSince <= 90) rowClass = 'old-purchase';
+            else if (daysSince > 90) rowClass = 'very-old-purchase';
+
+            tableHTML += `
+                <tr class="${rowClass}">
+                    <td>${customer.CLIENTE_NOME || ''}</td>
+                    <td>${customer.CLIENTE_EMAIL || ''}</td>
+                    <td>${phone}</td>
+                    <td>${whatsappButton}</td>
+                    <td>${customer.PEDIDOS || 0}</td>
+                    <td>${totalValue}</td>
+                    <td>${customer.ULTIMA_COMPRA}</td>
+                    <td>${daysSince} dias</td>
+                    <td>${customer.ENDERECO_ESTADO || ''}</td>
+                </tr>
+            `;
+        });
+
+        tableHTML += `
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-info">
+                <p>Mostrando ${data.length} clientes</p>
+            </div>
+        `;
+
+        container.innerHTML = tableHTML;
+    }
+
+    formatWhatsAppButton(value, row) {
+        const phoneNumber = row.CLIENTE_TELEFONE_CELULAR;
+        if (!phoneNumber) {
+            return '<span class="no-phone">-</span>';
+        }
+        
+        const whatsappNumber = phoneNumber.toString().replace(/\D/g, '');
+        if (!whatsappNumber) {
+            return '<span class="no-phone">-</span>';
+        }
+        
+        return `<button class="whatsapp-btn" onclick="window.open('https://wa.me/55${whatsappNumber}', '_blank')" title="Enviar mensagem no WhatsApp">
+            📱 WhatsApp
+        </button>`;
     }
 }
 
