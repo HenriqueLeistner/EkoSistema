@@ -175,6 +175,7 @@ class EkobrazilIntegratedSystem {
         const startDate = document.getElementById('startDateFilter');
         const endDate = document.getElementById('endDateFilter');
         const periodPreset = document.getElementById('periodPreset');
+        const periodStatusFilter = document.getElementById('periodStatusFilter');
 
         if (startDate) {
             startDate.addEventListener('change', () => this.filterByPeriod());
@@ -187,6 +188,9 @@ class EkobrazilIntegratedSystem {
                 this.applyPresetPeriod();
                 this.filterByPeriod();
             });
+        }
+        if (periodStatusFilter) {
+            periodStatusFilter.addEventListener('change', () => this.filterByPeriod());
         }
 
         // Set default dates
@@ -251,6 +255,21 @@ class EkobrazilIntegratedSystem {
                 option.value = state;
                 option.textContent = state;
                 customerStateFilter.appendChild(option);
+            });
+        }
+
+        // Populate period status filter
+        const periodStatusFilter = document.getElementById('periodStatusFilter');
+        if (periodStatusFilter && this.data.orders) {
+            const statuses = [...new Set(this.data.orders
+                .map(o => o.PEDIDO_SITUACAO)
+                .filter(s => s))].sort();
+            
+            statuses.forEach(status => {
+                const option = document.createElement('option');
+                option.value = status;
+                option.textContent = status;
+                periodStatusFilter.appendChild(option);
             });
         }
     }
@@ -450,23 +469,32 @@ class EkobrazilIntegratedSystem {
     getOrdersInPeriod() {
         const startDateStr = document.getElementById('startDateFilter')?.value;
         const endDateStr = document.getElementById('endDateFilter')?.value;
+        const selectedStatus = document.getElementById('periodStatusFilter')?.value || 'todos';
 
-        if (!startDateStr || !endDateStr) {
-            return this.data.orders;
+        let orders = this.data.orders;
+
+        // Filter by date period
+        if (startDateStr && endDateStr) {
+            const startDate = new Date(startDateStr);
+            const endDate = new Date(endDateStr);
+            endDate.setHours(23, 59, 59, 999); // Include entire end date
+
+            orders = orders.filter(order => {
+                if (!order.PEDIDO_DATA_CRIACAO) return false;
+                
+                const orderDate = this.parseDate(order.PEDIDO_DATA_CRIACAO);
+                if (!orderDate || isNaN(orderDate.getTime())) return false;
+                
+                return orderDate >= startDate && orderDate <= endDate;
+            });
         }
 
-        const startDate = new Date(startDateStr);
-        const endDate = new Date(endDateStr);
-        endDate.setHours(23, 59, 59, 999); // Include entire end date
+        // Filter by status
+        if (selectedStatus && selectedStatus !== 'todos') {
+            orders = orders.filter(order => order.PEDIDO_SITUACAO === selectedStatus);
+        }
 
-        return this.data.orders.filter(order => {
-            if (!order.PEDIDO_DATA_CRIACAO) return false;
-            
-            const orderDate = this.parseDate(order.PEDIDO_DATA_CRIACAO);
-            if (!orderDate || isNaN(orderDate.getTime())) return false;
-            
-            return orderDate >= startDate && orderDate <= endDate;
-        });
+        return orders;
     }
 
     parseDate(dateStr) {
