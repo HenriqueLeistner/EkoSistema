@@ -518,27 +518,31 @@ class EkobrazilIntegratedSystem {
         
         if (chartContainer) {
             if (sortedDates.length === 0) {
-                chartContainer.innerHTML = '<p style="text-align: center; padding: 2rem;">Nenhum pedido encontrado no período selecionado.</p>';
+                chartContainer.innerHTML = '<p style="text-align: center; padding: 1rem; font-size: 0.9rem; color: #666;">Nenhum pedido encontrado no período selecionado.</p>';
                 return;
             }
 
             const maxCount = Math.max(...Object.values(dailyCounts));
             
-            chartContainer.innerHTML = sortedDates.map(date => {
-                const count = dailyCounts[date];
-                const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                const formattedDate = new Date(date).toLocaleDateString('pt-BR');
-                
-                return `
-                    <div style="display: flex; align-items: center; margin: 0.5rem 0; padding: 0.5rem; background: white; border-radius: 5px;">
-                        <div style="width: 80px; font-size: 0.9rem;">${formattedDate}</div>
-                        <div style="flex: 1; margin: 0 1rem;">
-                            <div style="background: #9BC53D; height: 20px; width: ${percentage}%; border-radius: 3px; min-width: 2px;"></div>
-                        </div>
-                        <div style="width: 40px; text-align: right; font-weight: bold;">${count}</div>
-                    </div>
-                `;
-            }).join('');
+            chartContainer.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem;">
+                    ${sortedDates.map(date => {
+                        const count = dailyCounts[date];
+                        const formattedDate = new Date(date).toLocaleDateString('pt-BR', { 
+                            day: '2-digit', 
+                            month: '2-digit' 
+                        });
+                        
+                        return `
+                            <div style="background: linear-gradient(135deg, #f8fcf4 0%, #e8f5d3 100%); border: 1px solid #9BC53D; border-radius: 6px; padding: 0.5rem; text-align: center; min-height: 60px; display: flex; flex-direction: column; justify-content: center;">
+                                <div style="font-size: 0.75rem; color: #666; margin-bottom: 0.2rem;">${formattedDate}</div>
+                                <div style="font-size: 1.2rem; font-weight: 700; color: #7BA428;">${count}</div>
+                                <div style="font-size: 0.65rem; color: #999;">pedidos</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
         }
     }
 
