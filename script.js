@@ -92,6 +92,8 @@ class EkobrazilIntegratedSystem {
         const tabButtons = document.querySelectorAll('.tab-button');
         tabButtons.forEach(button => {
             button.addEventListener('click', (e) => {
+                e.preventDefault(); // Evita o comportamento padrão
+                e.stopPropagation(); // Para a propagação do evento
                 const tabId = e.target.getAttribute('data-tab');
                 this.switchTab(tabId);
             });
@@ -311,20 +313,38 @@ class EkobrazilIntegratedSystem {
     }
 
     switchTab(tabId) {
+        // Prevent switching if already on the same tab
+        if (this.currentTab === tabId) return;
+
+        // Store current scroll position
+        const currentScrollY = window.scrollY;
+
         // Update active tab button
         document.querySelectorAll('.tab-button').forEach(btn => {
             btn.classList.remove('active');
         });
-        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+        const activeButton = document.querySelector(`[data-tab="${tabId}"]`);
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
 
-        // Update active tab content
+        // Hide all tab content
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
         });
-        document.getElementById(tabId).classList.add('active');
 
-        this.currentTab = tabId;
-        this.updateCurrentTab();
+        // Show new tab content with animation
+        const newContent = document.getElementById(tabId);
+        if (newContent) {
+            setTimeout(() => {
+                newContent.classList.add('active');
+                this.currentTab = tabId;
+                this.updateCurrentTab();
+                
+                // Restore scroll position
+                window.scrollTo(0, currentScrollY);
+            }, 50);
+        }
     }
 
     updateCurrentTab() {
@@ -474,23 +494,28 @@ class EkobrazilIntegratedSystem {
     renderPeriodAnalysis() {
         const filteredOrders = this.getOrdersInPeriod();
         
+        // Enrich orders with customer data (phone numbers)
+        const enrichedOrders = this.enrichOrdersWithCustomerData(filteredOrders);
+        
         // Update period metrics
-        const totalValue = filteredOrders.reduce((sum, o) => sum + this.parseValue(o.PEDIDO_VALOR_TOTAL), 0);
-        const approvedOrders = filteredOrders.filter(o => o.PEDIDO_SITUACAO && o.PEDIDO_SITUACAO.toLowerCase().includes('aprovado')).length;
-        const avgValue = filteredOrders.length > 0 ? totalValue / filteredOrders.length : 0;
+        const totalValue = enrichedOrders.reduce((sum, o) => sum + this.parseValue(o.PEDIDO_VALOR_TOTAL), 0);
+        const approvedOrders = enrichedOrders.filter(o => o.PEDIDO_SITUACAO && o.PEDIDO_SITUACAO.toLowerCase().includes('aprovado')).length;
+        const avgValue = enrichedOrders.length > 0 ? totalValue / enrichedOrders.length : 0;
 
-        this.updateElement('periodOrdersMetric', filteredOrders.length);
+        this.updateElement('periodOrdersMetric', enrichedOrders.length);
         this.updateElement('periodValueMetric', this.formatCurrency(totalValue));
         this.updateElement('periodApprovedMetric', approvedOrders);
         this.updateElement('periodAvgMetric', this.formatCurrency(avgValue));
 
         // Daily orders chart
-        this.renderDailyChart(filteredOrders);
+        this.renderDailyChart(enrichedOrders);
 
-        // Orders table
-        this.renderTable('periodOrdersTable', filteredOrders, [
+        // Orders table with phone and WhatsApp
+        this.renderTable('periodOrdersTable', enrichedOrders, [
             { key: 'PEDIDO_DATA_CRIACAO', title: 'Data', formatter: this.formatDate },
             { key: 'CLIENTE_EMAIL', title: 'Email' },
+            { key: 'CLIENTE_TELEFONE_CELULAR', title: 'Telefone', formatter: this.formatPhone },
+            { key: 'WHATSAPP_BUTTON', title: 'WhatsApp', formatter: this.formatWhatsAppButton },
             { key: 'PEDIDO_NUMERO', title: 'Número' },
             { key: 'PEDIDO_SITUACAO', title: 'Status' },
             { key: 'PEDIDO_VALOR_TOTAL', title: 'Valor', formatter: this.formatCurrency },
@@ -691,7 +716,12 @@ class EkobrazilIntegratedSystem {
                 if (col.formatter) {
                     value = col.formatter.call(this, value, row);
                 }
-                td.textContent = value || '';
+                // Use innerHTML for HTML content (like WhatsApp buttons), textContent for text
+                if (col.key === 'WHATSAPP_BUTTON' || (col.formatter && col.formatter.name === 'formatWhatsAppButton')) {
+                    td.innerHTML = value || '';
+                } else {
+                    td.textContent = value || '';
+                }
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
@@ -1475,6 +1505,35 @@ class EkobrazilIntegratedSystem {
         `;
 
         container.innerHTML = tableHTML;
+    }
+
+    enrichOrdersWithCustomerData(orders) {
+        return orders.map(order => {
+            // Find customer data by email
+            const customer = this.findCustomerByEmail(order.CLIENTE_EMAIL);
+            
+            return {
+                ...order,
+                CLIENTE_TELEFONE_CELULAR: customer ? customer.CLIENTE_TELEFONE_CELULAR : null,
+                WHATSAPP_BUTTON: customer ? customer.CLIENTE_TELEFONE_CELULAR : null
+            };
+        });
+    }
+
+    findCustomerByEmail(email) {
+        if (!email) return null;
+        
+        // First try customerStats (has more complete data)
+        let customer = this.data.customerStats?.find(c => c.CLIENTE_EMAIL === email);
+        if (customer) return customer;
+        
+        // Then try customers list
+        customer = this.data.customers?.find(c => c.CLIENTE_EMAIL === email);
+        if (customer) return customer;
+        
+        // Finally try original customers
+        customer = this.data.originalCustomers?.find(c => c.CLIENTE_EMAIL === email);
+        return customer || null;
     }
 
     formatWhatsAppButton(value, row) {
