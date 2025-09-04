@@ -324,6 +324,9 @@ class EkobrazilIntegratedSystem {
         this.updateElement('totalValueMetric', this.formatCurrency(totalValue));
         this.updateElement('approvedOrdersMetric', approvedOrders);
 
+        // Render recent orders summary
+        this.renderRecentOrdersSummary();
+
         // Render table
         this.renderTable('customerStatsTable', data, [
             { key: 'CLIENTE_NOME', title: 'Nome' },
@@ -361,6 +364,56 @@ class EkobrazilIntegratedSystem {
             { key: 'ENDERECO_ENTREGA_CIDADE', title: 'Cidade' },
             { key: 'ENDERECO_ENTREGA_ESTADO', title: 'Estado' }
         ]);
+    }
+
+    renderRecentOrdersSummary() {
+        // Get recent orders (last 10 orders)
+        const allOrders = this.data.orders || [];
+        
+        // Sort orders by creation date (most recent first)
+        const sortedOrders = [...allOrders].sort((a, b) => {
+            const dateA = this.parseDate(a.PEDIDO_DATA_CRIACAO);
+            const dateB = this.parseDate(b.PEDIDO_DATA_CRIACAO);
+            if (!dateA || !dateB) return 0;
+            return dateB - dateA;
+        });
+        
+        const recentOrders = sortedOrders.slice(0, 10);
+        
+        const container = document.getElementById('recentOrdersSummary');
+        if (!container) return;
+        
+        if (recentOrders.length === 0) {
+            container.innerHTML = '<p style="text-align: center; padding: 1rem; color: #666;">Nenhum pedido encontrado.</p>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                ${recentOrders.map(order => `
+                    <div style="background: linear-gradient(135deg, #f8fcf4 0%, #e8f5d3 100%); border: 1px solid #9BC53D; border-radius: 8px; padding: 0.75rem; font-size: 0.85rem;">
+                        <div style="font-weight: 600; color: #7BA428; margin-bottom: 0.3rem;">Pedido #${order.PEDIDO_NUMERO || 'N/A'}</div>
+                        <div style="color: #666; margin-bottom: 0.2rem;">${order.CLIENTE_EMAIL || 'Email não informado'}</div>
+                        <div style="color: #333; margin-bottom: 0.2rem;"><strong>${this.formatCurrency(order.PEDIDO_VALOR_TOTAL)}</strong></div>
+                        <div style="color: #666; margin-bottom: 0.2rem;">${this.formatDate(order.PEDIDO_DATA_CRIACAO)}</div>
+                        <div style="background: ${this.getStatusColor(order.PEDIDO_SITUACAO)}; color: white; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.75rem; text-align: center;">
+                            ${order.PEDIDO_SITUACAO || 'Status não informado'}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    getStatusColor(status) {
+        if (!status) return '#999';
+        
+        const lowerStatus = status.toLowerCase();
+        if (lowerStatus.includes('aprovado') || lowerStatus.includes('pago')) return '#28a745';
+        if (lowerStatus.includes('cancelado') || lowerStatus.includes('devolvido')) return '#dc3545';
+        if (lowerStatus.includes('processamento') || lowerStatus.includes('separação')) return '#ffc107';
+        if (lowerStatus.includes('enviado') || lowerStatus.includes('entregue')) return '#17a2b8';
+        return '#6c757d';
     }
 
     renderCustomerList() {
