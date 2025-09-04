@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ekobrazil - Sistema de Clientes</title>
+    <title>Ekobrazil - Sistema Integrado de Clientes e Pedidos</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
 </head>
@@ -12,9 +12,9 @@
         <!-- Header -->
         <header class="main-header">
             <div class="logo-container">
-                <h1 class="title-text">🌿 Ekobrazil - Dados de Clientes</h1>
+                <h1 class="title-text">🌿 Ekobrazil - Sistema Integrado de Clientes e Pedidos</h1>
             </div>
-            <p class="subtitle-text">Inteligência Ecológica - Sistema de Gestão de Clientes</p>
+            <p class="subtitle-text">Inteligência Ecológica - Gestão Completa de Clientes e Vendas</p>
             
             <!-- User info and logout -->
             <div class="user-info">
@@ -31,109 +31,422 @@
         <!-- Success Message -->
         <div class="success-message" id="successMessage">
             <h4>✅ Dados carregados com sucesso!</h4>
-            <p id="totalClients">359 clientes encontrados na base de dados Ekobrazil</p>
+            <p id="totalClients">1.742 registros encontrados na base de dados Ekobrazil</p>
         </div>
 
-        <!-- Filters Section -->
-        <div class="filter-section">
-            <h3 class="filter-title">🔍 Filtros e Pesquisa</h3>
+        <!-- Navigation Tabs -->
+        <div class="tabs-container">
+            <div class="tabs-header">
+                <button class="tab-button active" data-tab="customer-summary">📊 Resumo de Clientes</button>
+                <button class="tab-button" data-tab="orders-data">🛒 Dados de Pedidos</button>
+                <button class="tab-button" data-tab="customer-list">📋 Lista de Clientes</button>
+                <button class="tab-button" data-tab="sales-analysis">📅 Pedidos por Período</button>
+                <button class="tab-button" data-tab="add-data">➕ Adicionar Dados</button>
+            </div>
+        </div>
+
+        <!-- Tab Content Areas -->
+        <div id="customer-summary" class="tab-content active">
+            <div class="filter-section">
+                <h3 class="filter-title">🔍 Filtros - Resumo de Clientes</h3>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label for="customerSearchInput">Pesquisar por nome:</label>
+                        <input type="text" id="customerSearchInput" placeholder="Digite o nome do cliente..." class="search-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="minOrdersFilter">Mínimo de pedidos:</label>
+                        <input type="number" id="minOrdersFilter" min="0" value="0" class="number-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="stateFilter">Estado:</label>
+                        <select id="stateFilter" class="state-filter">
+                            <option value="todos">Todos os Estados</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="metrics-section">
+                <h3>📊 Resumo Estatístico</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h2 id="totalCustomersMetric">512</h2>
+                        <p>Total de Clientes</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="totalOrdersMetric">0</h2>
+                        <p>Total de Pedidos</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="totalValueMetric">R$ 0,00</h2>
+                        <p>Valor Total</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="approvedOrdersMetric">0</h2>
+                        <p>Pedidos Aprovados</p>
+                    </div>
+                </div>
+            </div>
+            <div id="customerStatsTable" class="table-container"></div>
+        </div>
+
+        <div id="orders-data" class="tab-content">
+            <div class="filter-section">
+                <h3 class="filter-title">🔍 Filtros - Dados de Pedidos</h3>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label for="emailSearchInput">Pesquisar por email:</label>
+                        <input type="text" id="emailSearchInput" placeholder="Digite o email do cliente..." class="search-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="statusFilter">Status do pedido:</label>
+                        <select id="statusFilter" class="status-filter">
+                            <option value="todos">Todos os Status</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="minValueFilter">Valor mínimo:</label>
+                        <input type="number" id="minValueFilter" min="0" step="0.01" value="0" class="number-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="orderStateFilter">Estado de entrega:</label>
+                        <select id="orderStateFilter" class="state-filter">
+                            <option value="todos">Todos os Estados</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="metrics-section">
+                <h3>📊 Resumo de Pedidos</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h2 id="totalOrdersCountMetric">739</h2>
+                        <p>Total de Pedidos</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="ordersValueMetric">R$ 0,00</h2>
+                        <p>Valor Total</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="avgTicketMetric">R$ 0,00</h2>
+                        <p>Ticket Médio</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="uniqueCustomersMetric">0</h2>
+                        <p>Clientes Únicos</p>
+                    </div>
+                </div>
+            </div>
+            <div id="ordersTable" class="table-container"></div>
+        </div>
+
+        <div id="customer-list" class="tab-content">
+            <div class="filter-section">
+                <h3 class="filter-title">🔍 Filtros - Lista de Clientes</h3>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label for="customerListSearchInput">Pesquisar cliente:</label>
+                        <input type="text" id="customerListSearchInput" placeholder="Digite nome ou email..." class="search-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="customerStateFilter">Estado:</label>
+                        <select id="customerStateFilter" class="state-filter">
+                            <option value="todos">Todos os Estados</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="metrics-section">
+                <h3>📊 Resumo da Lista</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h2 id="totalCustomersListMetric">491</h2>
+                        <p>Total de Clientes</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="withPhoneMetric">0</h2>
+                        <p>Com Telefone</p>
+                    </div>
+                </div>
+            </div>
+            <div id="customerListTable" class="table-container"></div>
+        </div>
+
+        <div id="sales-analysis" class="tab-content">
+            <div class="filter-section">
+                <h3 class="filter-title">📅 Filtros - Pedidos por Período</h3>
+                <div class="filter-controls">
+                    <div class="filter-group">
+                        <label for="startDateFilter">Data inicial:</label>
+                        <input type="date" id="startDateFilter" class="date-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="endDateFilter">Data final:</label>
+                        <input type="date" id="endDateFilter" class="date-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="periodPreset">Período pré-definido:</label>
+                        <select id="periodPreset" class="period-filter">
+                            <option value="custom">Personalizado</option>
+                            <option value="last7">Últimos 7 dias</option>
+                            <option value="last30">Últimos 30 dias</option>
+                            <option value="last90">Últimos 90 dias</option>
+                            <option value="thisMonth">Este mês</option>
+                            <option value="lastMonth">Mês passado</option>
+                            <option value="thisYear">Este ano</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             
-            <div class="filter-controls">
-                <div class="filter-group">
-                    <label for="searchInput">Pesquisar por nome:</label>
-                    <input type="text" id="searchInput" placeholder="Digite o nome do cliente..." class="search-input">
+            <div class="metrics-section">
+                <h3>📊 Resumo do Período</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h2 id="periodOrdersMetric">0</h2>
+                        <p>Pedidos no Período</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="periodValueMetric">R$ 0,00</h2>
+                        <p>Valor Total</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="periodApprovedMetric">0</h2>
+                        <p>Pedidos Aprovados</p>
+                    </div>
+                    <div class="metric-card">
+                        <h2 id="periodAvgMetric">R$ 0,00</h2>
+                        <p>Ticket Médio</p>
+                    </div>
                 </div>
-                
-                <div class="filter-group">
-                    <label for="timeFilter">Filtrar por última compra:</label>
-                    <select id="timeFilter" class="time-filter">
-                        <option value="todos">Todos</option>
-                        <option value="30">Últimos 30 dias</option>
-                        <option value="60">31-60 dias</option>
-                        <option value="90">61-90 dias</option>
-                        <option value="90+">Mais de 90 dias</option>
-                    </select>
-                </div>
-                
-                <div class="filter-group">
-                    <label for="sortOption">Ordenar por:</label>
-                    <select id="sortOption" class="sort-option">
-                        <option value="nome">Nome</option>
-                        <option value="data">Data da Última Compra</option>
-                    </select>
-                </div>
+            </div>
+
+            <div class="analysis-section">
+                <h4>📈 Pedidos por Dia</h4>
+                <div id="dailyOrdersChart" class="chart-container"></div>
+            </div>
+
+            <div class="analysis-section">
+                <h4>📋 Detalhes dos Pedidos</h4>
+                <div id="periodOrdersTable" class="table-container"></div>
             </div>
         </div>
 
-        <!-- Metrics -->
-        <div class="metrics-section">
-            <h3>📊 Resumo dos Dados</h3>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <h2 id="totalMetric">359</h2>
-                    <p>Total de Clientes</p>
-                </div>
-                <div class="metric-card">
-                    <h2 id="filteredMetric">359</h2>
-                    <p>Filtrados</p>
-                </div>
-                <div class="metric-card">
-                    <h2 id="phoneMetric">359</h2>
-                    <p>Com Telefone</p>
-                </div>
-                <div class="metric-card">
-                    <h2 id="dateMetric">359</h2>
-                    <p>Com Data de Compra</p>
+        <div id="add-data" class="tab-content">
+            <div class="filter-section">
+                <h3 class="filter-title">➕ Adicionar Novos Dados</h3>
+                <div class="form-tabs">
+                    <button class="form-tab-button active" data-form="customer-form">👤 Novo Cliente</button>
+                    <button class="form-tab-button" data-form="order-form">🛒 Novo Pedido</button>
                 </div>
             </div>
+
+            <!-- Formulário de Novo Cliente -->
+            <div id="customer-form" class="form-content active">
+                <div class="metrics-section">
+                    <h3>👤 Cadastro de Novo Cliente</h3>
+                    <form id="newCustomerForm" class="data-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerName">Nome *</label>
+                                <input type="text" id="customerName" name="customerName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="customerEmail">Email *</label>
+                                <input type="email" id="customerEmail" name="customerEmail" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerPhone">Telefone</label>
+                                <input type="tel" id="customerPhone" name="customerPhone" placeholder="(11) 99999-9999">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerCPF">CPF/CNPJ</label>
+                                <input type="text" id="customerCPF" name="customerCPF" placeholder="000.000.000-00">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerAddress">Endereço</label>
+                                <input type="text" id="customerAddress" name="customerAddress">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerNumber">Número</label>
+                                <input type="text" id="customerNumber" name="customerNumber">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerCity">Cidade</label>
+                                <input type="text" id="customerCity" name="customerCity">
+                            </div>
+                            <div class="form-group">
+                                <label for="customerState">Estado</label>
+                                <select id="customerState" name="customerState">
+                                    <option value="">Selecione</option>
+                                    <option value="AC">Acre</option>
+                                    <option value="AL">Alagoas</option>
+                                    <option value="AP">Amapá</option>
+                                    <option value="AM">Amazonas</option>
+                                    <option value="BA">Bahia</option>
+                                    <option value="CE">Ceará</option>
+                                    <option value="DF">Distrito Federal</option>
+                                    <option value="ES">Espírito Santo</option>
+                                    <option value="GO">Goiás</option>
+                                    <option value="MA">Maranhão</option>
+                                    <option value="MT">Mato Grosso</option>
+                                    <option value="MS">Mato Grosso do Sul</option>
+                                    <option value="MG">Minas Gerais</option>
+                                    <option value="PA">Pará</option>
+                                    <option value="PB">Paraíba</option>
+                                    <option value="PR">Paraná</option>
+                                    <option value="PE">Pernambuco</option>
+                                    <option value="PI">Piauí</option>
+                                    <option value="RJ">Rio de Janeiro</option>
+                                    <option value="RN">Rio Grande do Norte</option>
+                                    <option value="RS">Rio Grande do Sul</option>
+                                    <option value="RO">Rondônia</option>
+                                    <option value="RR">Roraima</option>
+                                    <option value="SC">Santa Catarina</option>
+                                    <option value="SP">São Paulo</option>
+                                    <option value="SE">Sergipe</option>
+                                    <option value="TO">Tocantins</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="submit-btn">💾 Salvar Cliente</button>
+                            <button type="reset" class="reset-btn">🔄 Limpar Formulário</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Formulário de Novo Pedido -->
+            <div id="order-form" class="form-content">
+                <div class="metrics-section">
+                    <h3>🛒 Cadastro de Novo Pedido</h3>
+                    <form id="newOrderForm" class="data-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="orderCustomerEmail">Email do Cliente *</label>
+                                <input type="email" id="orderCustomerEmail" name="orderCustomerEmail" required placeholder="cliente@email.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="orderNumber">Número do Pedido *</label>
+                                <input type="text" id="orderNumber" name="orderNumber" required placeholder="123456">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="orderValue">Valor Total *</label>
+                                <input type="number" id="orderValue" name="orderValue" step="0.01" min="0" required placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="orderStatus">Status do Pedido *</label>
+                                <select id="orderStatus" name="orderStatus" required>
+                                    <option value="">Selecione</option>
+                                    <option value="Aguardando Pagamento">Aguardando Pagamento</option>
+                                    <option value="Pago">Pago</option>
+                                    <option value="Aprovado">Aprovado</option>
+                                    <option value="Em Processamento">Em Processamento</option>
+                                    <option value="Enviado">Enviado</option>
+                                    <option value="Entregue">Entregue</option>
+                                    <option value="Cancelado">Cancelado</option>
+                                    <option value="Devolvido">Devolvido</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="orderPayment">Forma de Pagamento</label>
+                                <select id="orderPayment" name="orderPayment">
+                                    <option value="">Selecione</option>
+                                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                                    <option value="Cartão de Débito">Cartão de Débito</option>
+                                    <option value="PIX">PIX</option>
+                                    <option value="Boleto">Boleto</option>
+                                    <option value="Transferência">Transferência</option>
+                                    <option value="Dinheiro">Dinheiro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="orderDate">Data do Pedido</label>
+                                <input type="date" id="orderDate" name="orderDate">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="orderDeliveryCity">Cidade de Entrega</label>
+                                <input type="text" id="orderDeliveryCity" name="orderDeliveryCity">
+                            </div>
+                            <div class="form-group">
+                                <label for="orderDeliveryState">Estado de Entrega</label>
+                                <select id="orderDeliveryState" name="orderDeliveryState">
+                                    <option value="">Selecione</option>
+                                    <option value="AC">Acre</option>
+                                    <option value="AL">Alagoas</option>
+                                    <option value="AP">Amapá</option>
+                                    <option value="AM">Amazonas</option>
+                                    <option value="BA">Bahia</option>
+                                    <option value="CE">Ceará</option>
+                                    <option value="DF">Distrito Federal</option>
+                                    <option value="ES">Espírito Santo</option>
+                                    <option value="GO">Goiás</option>
+                                    <option value="MA">Maranhão</option>
+                                    <option value="MT">Mato Grosso</option>
+                                    <option value="MS">Mato Grosso do Sul</option>
+                                    <option value="MG">Minas Gerais</option>
+                                    <option value="PA">Pará</option>
+                                    <option value="PB">Paraíba</option>
+                                    <option value="PR">Paraná</option>
+                                    <option value="PE">Pernambuco</option>
+                                    <option value="PI">Piauí</option>
+                                    <option value="RJ">Rio de Janeiro</option>
+                                    <option value="RN">Rio Grande do Norte</option>
+                                    <option value="RS">Rio Grande do Sul</option>
+                                    <option value="RO">Rondônia</option>
+                                    <option value="RR">Roraima</option>
+                                    <option value="SC">Santa Catarina</option>
+                                    <option value="SP">São Paulo</option>
+                                    <option value="SE">Sergipe</option>
+                                    <option value="TO">Tocantins</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="submit-btn">💾 Salvar Pedido</button>
+                            <button type="reset" class="reset-btn">🔄 Limpar Formulário</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Mensagens de Resultado -->
+            <div id="formMessages" class="form-messages"></div>
         </div>
 
-        <!-- Filter Info -->
-        <div class="filter-info" id="filterInfo" style="display: none;">
-            <p id="filterInfoText">📋 Mostrando resultados filtrados</p>
-        </div>
-
-        <!-- Data Table Section -->
-        <div class="table-section">
-            <h3>📋 Dados dos Clientes Ekobrazil</h3>
-            <hr class="divider">
-            
-            <div class="table-container">
-                <table id="clientsTable" class="clients-table">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Telefone</th>
-                            <th>Data da Última Compra</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        <!-- Data will be populated by JavaScript -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Loading indicator -->
-            <div class="loading" id="loading">
-                <div class="loading-spinner"></div>
-                <p>Carregando dados...</p>
-            </div>
-
-            <!-- No results message -->
-            <div class="no-results" id="noResults" style="display: none;">
-                <p>🔍 Nenhum cliente encontrado com os critérios selecionados.</p>
-            </div>
-
-            <!-- Download button -->
-            <div class="download-section">
-                <button id="downloadBtn" class="download-btn">
-                    🌿 Baixar dados Ekobrazil (CSV)
-                </button>
+        <!-- Data Display Controls -->
+        <div class="data-section">
+            <div class="data-controls">
+                <div class="results-info">
+                    <p id="resultsCount">Carregando dados...</p>
+                </div>
+                <div class="table-controls">
+                    <button id="downloadBtn" class="download-btn">🌿 Baixar dados (CSV)</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="data.js"></script>
+    <script>
+        console.log('Data loaded:', typeof window.ekobrazilData !== 'undefined');
+        if (typeof window.ekobrazilData !== 'undefined') {
+            console.log('Dados disponíveis:', Object.keys(window.ekobrazilData));
+        }
+    </script>
     <script src="script.js"></script>
 </body>
 </html>

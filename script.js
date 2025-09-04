@@ -1,13 +1,14 @@
-// Sistema de Clientes Ekobrazil - JavaScript Principal
+// Sistema Integrado de Clientes e Pedidos Ekobrazil
 
-class EkobrazilSystem {
+class EkobrazilIntegratedSystem {
     constructor() {
-        this.originalData = [];
-        this.filteredData = [];
-        this.currentFilters = {
-            search: '',
-            time: 'todos',
-            sort: 'nome'
+        this.data = null;
+        this.currentTab = 'customer-summary';
+        this.filteredData = {
+            customerStats: [],
+            orders: [],
+            customers: [],
+            originalCustomers: []
         };
         
         // Registrar instância global para debug
@@ -19,7 +20,7 @@ class EkobrazilSystem {
     init() {
         console.log('Inicializando EkobrazilSystem...');
         
-        // Verificar autenticação apenas uma vez na inicialização
+        // Verificar autenticação
         const session = sessionStorage.getItem('ekobrazil_session');
         if (!session) {
             console.log('Usuário não autenticado, redirecionando...');
@@ -47,273 +48,1094 @@ class EkobrazilSystem {
         }
 
         // Aguardar carregamento dos dados
-        if (typeof window.clientsData === 'undefined') {
-            console.log('Aguardando dados...');
-            setTimeout(() => this.init(), 100);
+        if (typeof window.ekobrazilData === 'undefined') {
+            console.log('Aguardando dados... Tentativa:', Date.now());
+            setTimeout(() => this.init(), 500);
             return;
         }
 
-        console.log('Dados carregados:', window.clientsData.length, 'clientes');
+        console.log('Dados carregados:', Object.keys(window.ekobrazilData));
         
-        this.originalData = window.clientsData;
-        this.filteredData = [...this.originalData];
+        this.data = window.ekobrazilData;
+        this.filteredData = {...this.data};
+        
+        // Load any saved data from localStorage
+        this.loadDataFromLocalStorage();
         
         this.setupUserInfo();
+        this.setupTabs();
         this.setupEventListeners();
-        this.renderTable();
-        this.updateMetrics();
-        this.hideLoading();
+        this.populateFilters();
+        this.updateCurrentTab();
         
         console.log('Sistema inicializado com sucesso!');
     }
 
     setupUserInfo() {
         const welcomeElement = document.getElementById('welcomeUser');
-        
-        // Obter usuário diretamente da sessão
         const session = sessionStorage.getItem('ekobrazil_session');
         if (session) {
             try {
                 const loginData = JSON.parse(session);
-                welcomeElement.textContent = `Bem-vindo, ${loginData.username}`;
+                if (welcomeElement) {
+                    welcomeElement.textContent = `Bem-vindo, ${loginData.username}`;
+                }
             } catch (e) {
-                welcomeElement.textContent = 'Bem-vindo, Usuário';
+                if (welcomeElement) {
+                    welcomeElement.textContent = 'Bem-vindo, Usuário';
+                }
             }
         }
     }
 
+    setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        tabButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const tabId = e.target.getAttribute('data-tab');
+                this.switchTab(tabId);
+            });
+        });
+    }
+
     setupEventListeners() {
-        console.log('Configurando event listeners...');
-        
         // Logout button
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
-                if (confirm('Tem certeza que deseja sair?')) {
-                    this.logout();
-                }
+                sessionStorage.removeItem('ekobrazil_session');
+                window.location.href = 'login.html';
             });
         }
 
-        // Pesquisa por nome
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                this.currentFilters.search = e.target.value.toLowerCase();
-                this.applyFilters();
-            });
-        }
-
-        // Filtro por tempo
-        const timeFilter = document.getElementById('timeFilter');
-        if (timeFilter) {
-            timeFilter.addEventListener('change', (e) => {
-                this.currentFilters.time = e.target.value;
-                this.applyFilters();
-            });
-        }
-
-        // Ordenação
-        const sortOption = document.getElementById('sortOption');
-        if (sortOption) {
-            sortOption.addEventListener('change', (e) => {
-                this.currentFilters.sort = e.target.value;
-                this.applyFilters();
-            });
-        }
-
-        // Download
+        // Download button
         const downloadBtn = document.getElementById('downloadBtn');
         if (downloadBtn) {
             downloadBtn.addEventListener('click', () => {
-                this.downloadCSV();
+                this.downloadCurrentData();
             });
         }
-        
-        console.log('Event listeners configurados');
+
+        // Filter event listeners for each tab
+        this.setupCustomerSummaryFilters();
+        this.setupOrdersFilters();
+        this.setupCustomerListFilters();
+        this.setupPeriodFilters();
     }
 
-    applyFilters() {
-        let filtered = [...this.originalData];
+    setupCustomerSummaryFilters() {
+        const searchInput = document.getElementById('customerSearchInput');
+        const minOrdersFilter = document.getElementById('minOrdersFilter');
+        const stateFilter = document.getElementById('stateFilter');
 
-        // Filtro por pesquisa
-        if (this.currentFilters.search) {
-            filtered = filtered.filter(client => 
-                client.nome.toLowerCase().includes(this.currentFilters.search)
-            );
+        if (searchInput) {
+            searchInput.addEventListener('input', () => this.filterCustomerStats());
         }
+        if (minOrdersFilter) {
+            minOrdersFilter.addEventListener('input', () => this.filterCustomerStats());
+        }
+        if (stateFilter) {
+            stateFilter.addEventListener('change', () => this.filterCustomerStats());
+        }
+    }
 
-        // Filtro por tempo
-        if (this.currentFilters.time !== 'todos') {
-            filtered = filtered.filter(client => {
-                const days = window.daysSincePurchase(client.data);
-                if (days === null) return false;
+    setupOrdersFilters() {
+        const emailSearch = document.getElementById('emailSearchInput');
+        const statusFilter = document.getElementById('statusFilter');
+        const minValueFilter = document.getElementById('minValueFilter');
+        const orderStateFilter = document.getElementById('orderStateFilter');
 
-                switch (this.currentFilters.time) {
-                    case '30':
-                        return days <= 30;
-                    case '60':
-                        return days > 30 && days <= 60;
-                    case '90':
-                        return days > 60 && days <= 90;
-                    case '90+':
-                        return days > 90;
-                    default:
-                        return true;
-                }
+        if (emailSearch) {
+            emailSearch.addEventListener('input', () => this.filterOrders());
+        }
+        if (statusFilter) {
+            statusFilter.addEventListener('change', () => this.filterOrders());
+        }
+        if (minValueFilter) {
+            minValueFilter.addEventListener('input', () => this.filterOrders());
+        }
+        if (orderStateFilter) {
+            orderStateFilter.addEventListener('change', () => this.filterOrders());
+        }
+    }
+
+    setupCustomerListFilters() {
+        const searchInput = document.getElementById('customerListSearchInput');
+        const stateFilter = document.getElementById('customerStateFilter');
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', () => this.filterCustomerList());
+        }
+        if (stateFilter) {
+            stateFilter.addEventListener('change', () => this.filterCustomerList());
+        }
+    }
+
+    setupPeriodFilters() {
+        const startDate = document.getElementById('startDateFilter');
+        const endDate = document.getElementById('endDateFilter');
+        const periodPreset = document.getElementById('periodPreset');
+
+        if (startDate) {
+            startDate.addEventListener('change', () => this.filterByPeriod());
+        }
+        if (endDate) {
+            endDate.addEventListener('change', () => this.filterByPeriod());
+        }
+        if (periodPreset) {
+            periodPreset.addEventListener('change', () => {
+                this.applyPresetPeriod();
+                this.filterByPeriod();
             });
         }
 
-        // Ordenação
-        if (this.currentFilters.sort === 'nome') {
-            filtered.sort((a, b) => a.nome.localeCompare(b.nome));
-        } else if (this.currentFilters.sort === 'data') {
-            filtered.sort((a, b) => {
-                const dateA = this.parseDate(a.data);
-                const dateB = this.parseDate(b.data);
-                return dateB - dateA; // Mais recente primeiro
+        // Set default dates
+        this.setDefaultDates();
+    }
+
+    populateFilters() {
+        // Populate state filter
+        const stateFilter = document.getElementById('stateFilter');
+        if (stateFilter && this.data.customerStats) {
+            const states = [...new Set(this.data.customerStats
+                .map(c => c.ENDERECO_ESTADO)
+                .filter(s => s))].sort();
+            
+            states.forEach(state => {
+                const option = document.createElement('option');
+                option.value = state;
+                option.textContent = state;
+                stateFilter.appendChild(option);
             });
         }
 
-        this.filteredData = filtered;
-        this.renderTable();
-        this.updateMetrics();
-        this.updateFilterInfo();
+        // Populate status filter
+        const statusFilter = document.getElementById('statusFilter');
+        if (statusFilter && this.data.orders) {
+            const statuses = [...new Set(this.data.orders
+                .map(o => o.PEDIDO_SITUACAO)
+                .filter(s => s))].sort();
+            
+            statuses.forEach(status => {
+                const option = document.createElement('option');
+                option.value = status;
+                option.textContent = status;
+                statusFilter.appendChild(option);
+            });
+        }
+
+        // Populate order state filter
+        const orderStateFilter = document.getElementById('orderStateFilter');
+        if (orderStateFilter && this.data.orders) {
+            const states = [...new Set(this.data.orders
+                .map(o => o.ENDERECO_ENTREGA_ESTADO)
+                .filter(s => s))].sort();
+            
+            states.forEach(state => {
+                const option = document.createElement('option');
+                option.value = state;
+                option.textContent = state;
+                orderStateFilter.appendChild(option);
+            });
+        }
+
+        // Populate customer state filter
+        const customerStateFilter = document.getElementById('customerStateFilter');
+        if (customerStateFilter && this.data.customers) {
+            const states = [...new Set(this.data.customers
+                .map(c => c.ENDERECO_ESTADO)
+                .filter(s => s))].sort();
+            
+            states.forEach(state => {
+                const option = document.createElement('option');
+                option.value = state;
+                option.textContent = state;
+                customerStateFilter.appendChild(option);
+            });
+        }
+    }
+
+    switchTab(tabId) {
+        // Update active tab button
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+
+        // Update active tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(tabId).classList.add('active');
+
+        this.currentTab = tabId;
+        this.updateCurrentTab();
+    }
+
+    updateCurrentTab() {
+        switch (this.currentTab) {
+            case 'customer-summary':
+                this.renderCustomerSummary();
+                break;
+            case 'orders-data':
+                this.renderOrdersData();
+                break;
+            case 'customer-list':
+                this.renderCustomerList();
+                break;
+            case 'sales-analysis':
+                this.renderPeriodAnalysis();
+                break;
+            case 'add-data':
+                this.setupAddDataTab();
+                break;
+        }
+    }
+
+    renderCustomerSummary() {
+        const data = this.filteredData.customerStats || this.data.customerStats;
+        
+        // Update metrics
+        const totalOrders = data.reduce((sum, c) => sum + (parseInt(c.PEDIDOS) || 0), 0);
+        const totalValue = data.reduce((sum, c) => sum + this.parseValue(c.VALOR_PEDIDOS_TOTAL), 0);
+        const approvedOrders = data.reduce((sum, c) => sum + (parseInt(c.QTD_APROVADOS) || 0), 0);
+
+        this.updateElement('totalCustomersMetric', data.length);
+        this.updateElement('totalOrdersMetric', totalOrders);
+        this.updateElement('totalValueMetric', this.formatCurrency(totalValue));
+        this.updateElement('approvedOrdersMetric', approvedOrders);
+
+        // Render table
+        this.renderTable('customerStatsTable', data, [
+            { key: 'CLIENTE_NOME', title: 'Nome' },
+            { key: 'CLIENTE_EMAIL', title: 'Email' },
+            { key: 'CLIENTE_TELEFONE_CELULAR', title: 'Telefone', formatter: this.formatPhone },
+            { key: 'PEDIDOS', title: 'Pedidos' },
+            { key: 'QTD_APROVADOS', title: 'Aprovados' },
+            { key: 'VALOR_PEDIDOS_TOTAL', title: 'Valor Total', formatter: this.formatCurrency },
+            { key: 'ENDERECO_CIDADE', title: 'Cidade' },
+            { key: 'ENDERECO_ESTADO', title: 'Estado' }
+        ]);
+    }
+
+    renderOrdersData() {
+        const data = this.filteredData.orders || this.data.orders;
+        
+        // Update metrics
+        const totalValue = data.reduce((sum, o) => sum + this.parseValue(o.PEDIDO_VALOR_TOTAL), 0);
+        const avgValue = data.length > 0 ? totalValue / data.length : 0;
+        const uniqueCustomers = new Set(data.map(o => o.CLIENTE_EMAIL)).size;
+
+        this.updateElement('totalOrdersCountMetric', data.length);
+        this.updateElement('ordersValueMetric', this.formatCurrency(totalValue));
+        this.updateElement('avgTicketMetric', this.formatCurrency(avgValue));
+        this.updateElement('uniqueCustomersMetric', uniqueCustomers);
+
+        // Render table
+        this.renderTable('ordersTable', data, [
+            { key: 'CLIENTE_EMAIL', title: 'Email' },
+            { key: 'PEDIDO_NUMERO', title: 'Número' },
+            { key: 'PEDIDO_SITUACAO', title: 'Status' },
+            { key: 'PEDIDO_VALOR_TOTAL', title: 'Valor', formatter: this.formatCurrency },
+            { key: 'PEDIDO_DATA_CRIACAO', title: 'Data', formatter: this.formatDate },
+            { key: 'PAGAMENTO_NOME', title: 'Pagamento' },
+            { key: 'ENDERECO_ENTREGA_CIDADE', title: 'Cidade' },
+            { key: 'ENDERECO_ENTREGA_ESTADO', title: 'Estado' }
+        ]);
+    }
+
+    renderCustomerList() {
+        const data = this.filteredData.customers || this.data.customers;
+        
+        // Update metrics
+        const withPhone = data.filter(c => c.CLIENTE_TELEFONE_CELULAR).length;
+
+        this.updateElement('totalCustomersListMetric', data.length);
+        this.updateElement('withPhoneMetric', withPhone);
+
+        // Render table
+        this.renderTable('customerListTable', data, [
+            { key: 'CLIENTE_NOME', title: 'Nome' },
+            { key: 'CLIENTE_EMAIL', title: 'Email' },
+            { key: 'CPF_CNPJ', title: 'CPF/CNPJ', formatter: this.formatCPF },
+            { key: 'CLIENTE_TELEFONE_CELULAR', title: 'Telefone', formatter: this.formatPhone },
+            { key: 'CLIENTE_DATA_CRIACAO', title: 'Data Cadastro', formatter: this.formatDate }
+        ]);
+    }
+
+    renderPeriodAnalysis() {
+        const filteredOrders = this.getOrdersInPeriod();
+        
+        // Update period metrics
+        const totalValue = filteredOrders.reduce((sum, o) => sum + this.parseValue(o.PEDIDO_VALOR_TOTAL), 0);
+        const approvedOrders = filteredOrders.filter(o => o.PEDIDO_SITUACAO && o.PEDIDO_SITUACAO.toLowerCase().includes('aprovado')).length;
+        const avgValue = filteredOrders.length > 0 ? totalValue / filteredOrders.length : 0;
+
+        this.updateElement('periodOrdersMetric', filteredOrders.length);
+        this.updateElement('periodValueMetric', this.formatCurrency(totalValue));
+        this.updateElement('periodApprovedMetric', approvedOrders);
+        this.updateElement('periodAvgMetric', this.formatCurrency(avgValue));
+
+        // Daily orders chart
+        this.renderDailyChart(filteredOrders);
+
+        // Orders table
+        this.renderTable('periodOrdersTable', filteredOrders, [
+            { key: 'PEDIDO_DATA_CRIACAO', title: 'Data', formatter: this.formatDate },
+            { key: 'CLIENTE_EMAIL', title: 'Email' },
+            { key: 'PEDIDO_NUMERO', title: 'Número' },
+            { key: 'PEDIDO_SITUACAO', title: 'Status' },
+            { key: 'PEDIDO_VALOR_TOTAL', title: 'Valor', formatter: this.formatCurrency },
+            { key: 'ENDERECO_ENTREGA_CIDADE', title: 'Cidade' }
+        ]);
+    }
+
+    setDefaultDates() {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30); // Last 30 days
+
+        const startInput = document.getElementById('startDateFilter');
+        const endInput = document.getElementById('endDateFilter');
+
+        if (startInput) {
+            startInput.value = startDate.toISOString().split('T')[0];
+        }
+        if (endInput) {
+            endInput.value = endDate.toISOString().split('T')[0];
+        }
+    }
+
+    applyPresetPeriod() {
+        const preset = document.getElementById('periodPreset')?.value;
+        const today = new Date();
+        let startDate = new Date();
+        let endDate = new Date();
+
+        switch (preset) {
+            case 'last7':
+                startDate.setDate(today.getDate() - 7);
+                break;
+            case 'last30':
+                startDate.setDate(today.getDate() - 30);
+                break;
+            case 'last90':
+                startDate.setDate(today.getDate() - 90);
+                break;
+            case 'thisMonth':
+                startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                break;
+            case 'lastMonth':
+                startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+                break;
+            case 'thisYear':
+                startDate = new Date(today.getFullYear(), 0, 1);
+                break;
+            default:
+                return; // Custom - don't change dates
+        }
+
+        const startInput = document.getElementById('startDateFilter');
+        const endInput = document.getElementById('endDateFilter');
+
+        if (startInput) {
+            startInput.value = startDate.toISOString().split('T')[0];
+        }
+        if (endInput) {
+            endInput.value = endDate.toISOString().split('T')[0];
+        }
+    }
+
+    getOrdersInPeriod() {
+        const startDateStr = document.getElementById('startDateFilter')?.value;
+        const endDateStr = document.getElementById('endDateFilter')?.value;
+
+        if (!startDateStr || !endDateStr) {
+            return this.data.orders;
+        }
+
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(endDateStr);
+        endDate.setHours(23, 59, 59, 999); // Include entire end date
+
+        return this.data.orders.filter(order => {
+            if (!order.PEDIDO_DATA_CRIACAO) return false;
+            
+            const orderDate = this.parseDate(order.PEDIDO_DATA_CRIACAO);
+            if (!orderDate || isNaN(orderDate.getTime())) return false;
+            
+            return orderDate >= startDate && orderDate <= endDate;
+        });
     }
 
     parseDate(dateStr) {
-        if (!dateStr) return new Date(0);
-        try {
-            const [day, month, year] = dateStr.split('/');
-            return new Date(year, month - 1, day);
-        } catch (e) {
-            return new Date(0);
-        }
-    }
-
-    renderTable() {
-        const tableBody = document.getElementById('tableBody');
-        const noResults = document.getElementById('noResults');
-        const table = document.getElementById('clientsTable');
-
-        if (this.filteredData.length === 0) {
-            table.style.display = 'none';
-            noResults.style.display = 'block';
-            return;
-        }
-
-        table.style.display = 'table';
-        noResults.style.display = 'none';
-
-        tableBody.innerHTML = this.filteredData.map(client => `
-            <tr>
-                <td>${this.escapeHtml(client.nome)}</td>
-                <td>${this.escapeHtml(client.telefone)}</td>
-                <td>${this.escapeHtml(client.data)}</td>
-            </tr>
-        `).join('');
-    }
-
-    updateMetrics() {
-        const totalClients = this.originalData.length;
-        const filteredClients = this.filteredData.length;
-        const clientsWithPhone = this.filteredData.filter(c => c.telefone && c.telefone !== '').length;
-        const clientsWithDate = this.filteredData.filter(c => c.data && c.data !== '').length;
-
-        document.getElementById('totalMetric').textContent = totalClients;
-        document.getElementById('filteredMetric').textContent = filteredClients;
-        document.getElementById('phoneMetric').textContent = clientsWithPhone;
-        document.getElementById('dateMetric').textContent = clientsWithDate;
-    }
-
-    updateFilterInfo() {
-        const filterInfo = document.getElementById('filterInfo');
-        const filterInfoText = document.getElementById('filterInfoText');
-
-        const hasFilters = this.currentFilters.search || this.currentFilters.time !== 'todos';
+        if (!dateStr) return null;
         
-        if (hasFilters) {
-            filterInfo.style.display = 'block';
-            filterInfoText.textContent = `📋 Mostrando ${this.filteredData.length} de ${this.originalData.length} clientes`;
-        } else {
-            filterInfo.style.display = 'none';
+        try {
+            // Se é formato DD/MM/YYYY HH:MM
+            if (typeof dateStr === 'string' && dateStr.includes('/')) {
+                const datePart = dateStr.split(' ')[0];
+                const parts = datePart.split('/');
+                if (parts.length === 3) {
+                    // Converte DD/MM/YYYY para Date
+                    const day = parseInt(parts[0]);
+                    const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+                    const year = parseInt(parts[2]);
+                    return new Date(year, month, day);
+                }
+            }
+            
+            // Formato padrão
+            return new Date(dateStr);
+        } catch (error) {
+            console.log('Erro ao fazer parse da data:', dateStr, error);
+            return null;
         }
     }
 
-    downloadCSV() {
-        if (this.filteredData.length === 0) {
-            alert('Nenhum dado para baixar!');
+    filterByPeriod() {
+        if (this.currentTab === 'sales-analysis') {
+            this.renderPeriodAnalysis();
+        }
+    }
+
+    renderDailyChart(orders) {
+        const dailyCounts = {};
+        
+        orders.forEach(order => {
+            if (order.PEDIDO_DATA_CRIACAO) {
+                const orderDate = this.parseDate(order.PEDIDO_DATA_CRIACAO);
+                if (orderDate && !isNaN(orderDate.getTime())) {
+                    const dateKey = orderDate.toISOString().split('T')[0];
+                    dailyCounts[dateKey] = (dailyCounts[dateKey] || 0) + 1;
+                }
+            }
+        });
+
+        const sortedDates = Object.keys(dailyCounts).sort();
+        const chartContainer = document.getElementById('dailyOrdersChart');
+        
+        if (chartContainer) {
+            if (sortedDates.length === 0) {
+                chartContainer.innerHTML = '<p style="text-align: center; padding: 2rem;">Nenhum pedido encontrado no período selecionado.</p>';
+                return;
+            }
+
+            const maxCount = Math.max(...Object.values(dailyCounts));
+            
+            chartContainer.innerHTML = sortedDates.map(date => {
+                const count = dailyCounts[date];
+                const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                const formattedDate = new Date(date).toLocaleDateString('pt-BR');
+                
+                return `
+                    <div style="display: flex; align-items: center; margin: 0.5rem 0; padding: 0.5rem; background: white; border-radius: 5px;">
+                        <div style="width: 80px; font-size: 0.9rem;">${formattedDate}</div>
+                        <div style="flex: 1; margin: 0 1rem;">
+                            <div style="background: #9BC53D; height: 20px; width: ${percentage}%; border-radius: 3px; min-width: 2px;"></div>
+                        </div>
+                        <div style="width: 40px; text-align: right; font-weight: bold;">${count}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    renderTable(containerId, data, columns) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+
+        // Header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        columns.forEach(col => {
+            const th = document.createElement('th');
+            th.textContent = col.title;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Body
+        const tbody = document.createElement('tbody');
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            columns.forEach(col => {
+                const td = document.createElement('td');
+                let value = row[col.key];
+                if (col.formatter) {
+                    value = col.formatter.call(this, value, row);
+                }
+                td.textContent = value || '';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+
+    filterCustomerStats() {
+        const searchTerm = document.getElementById('customerSearchInput')?.value.toLowerCase() || '';
+        const minOrders = parseInt(document.getElementById('minOrdersFilter')?.value) || 0;
+        const selectedState = document.getElementById('stateFilter')?.value || 'todos';
+
+        this.filteredData.customerStats = this.data.customerStats.filter(customer => {
+            const matchesSearch = !searchTerm || 
+                customer.CLIENTE_NOME?.toLowerCase().includes(searchTerm);
+            const matchesOrders = (parseInt(customer.PEDIDOS) || 0) >= minOrders;
+            const matchesState = selectedState === 'todos' || 
+                customer.ENDERECO_ESTADO === selectedState;
+
+            return matchesSearch && matchesOrders && matchesState;
+        });
+
+        this.renderCustomerSummary();
+    }
+
+    filterOrders() {
+        const emailSearch = document.getElementById('emailSearchInput')?.value.toLowerCase() || '';
+        const selectedStatus = document.getElementById('statusFilter')?.value || 'todos';
+        const minValue = parseFloat(document.getElementById('minValueFilter')?.value) || 0;
+        const selectedState = document.getElementById('orderStateFilter')?.value || 'todos';
+
+        this.filteredData.orders = this.data.orders.filter(order => {
+            const matchesEmail = !emailSearch || 
+                order.CLIENTE_EMAIL?.toLowerCase().includes(emailSearch);
+            const matchesStatus = selectedStatus === 'todos' || 
+                order.PEDIDO_SITUACAO === selectedStatus;
+            const matchesValue = this.parseValue(order.PEDIDO_VALOR_TOTAL) >= minValue;
+            const matchesState = selectedState === 'todos' || 
+                order.ENDERECO_ENTREGA_ESTADO === selectedState;
+
+            return matchesEmail && matchesStatus && matchesValue && matchesState;
+        });
+
+        this.renderOrdersData();
+    }
+
+    filterCustomerList() {
+        const searchTerm = document.getElementById('customerListSearchInput')?.value.toLowerCase() || '';
+        const selectedState = document.getElementById('customerStateFilter')?.value || 'todos';
+
+        this.filteredData.customers = this.data.customers.filter(customer => {
+            const matchesSearch = !searchTerm || 
+                customer.CLIENTE_NOME?.toLowerCase().includes(searchTerm) ||
+                customer.CLIENTE_EMAIL?.toLowerCase().includes(searchTerm);
+            const matchesState = selectedState === 'todos' || 
+                customer.ENDERECO_ESTADO === selectedState;
+
+            return matchesSearch && matchesState;
+        });
+
+        this.renderCustomerList();
+    }
+
+    downloadCurrentData() {
+        let data = [];
+        let filename = 'ekobrazil_dados';
+
+        switch (this.currentTab) {
+            case 'customer-summary':
+                data = this.filteredData.customerStats || this.data.customerStats;
+                filename = 'ekobrazil_clientes_resumo';
+                break;
+            case 'orders-data':
+                data = this.filteredData.orders || this.data.orders;
+                filename = 'ekobrazil_pedidos';
+                break;
+            case 'customer-list':
+                data = this.filteredData.customers || this.data.customers;
+                filename = 'ekobrazil_clientes_lista';
+                break;
+            default:
+                data = this.data.customerStats;
+        }
+
+        this.exportToCSV(data, filename);
+    }
+
+    exportToCSV(data, filename) {
+        if (!data || data.length === 0) {
+            alert('Nenhum dado para exportar');
             return;
         }
 
-        const headers = ['Nome', 'Telefone', 'Data da Última Compra'];
+        const headers = Object.keys(data[0]);
         const csvContent = [
             headers.join(','),
-            ...this.filteredData.map(client => [
-                `"${client.nome}"`,
-                `"${client.telefone}"`,
-                `"${client.data}"`
-            ].join(','))
-        ].join('\\n');
+            ...data.map(row => 
+                headers.map(header => {
+                    let value = row[header] || '';
+                    if (typeof value === 'string' && value.includes(',')) {
+                        value = `"${value}"`;
+                    }
+                    return value;
+                }).join(',')
+            )
+        ].join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
-            link.setAttribute('download', `ekobrazil_clientes_${timestamp}.csv`);
-            
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    updateElement(id, value) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
         }
     }
 
-    hideLoading() {
-        document.getElementById('loading').style.display = 'none';
+    parseValue(value) {
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') {
+            // Remove currency symbols and convert decimal separators
+            const cleaned = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+            return parseFloat(cleaned) || 0;
+        }
+        return 0;
     }
 
-    escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
+    formatCurrency(value) {
+        const num = this.parseValue(value);
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(num);
+    }
+
+    formatPhone(phone) {
+        if (!phone) return '';
+        const cleaned = phone.toString().replace(/\D/g, '');
+        if (cleaned.length === 11) {
+            return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+        } else if (cleaned.length === 10) {
+            return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+        }
+        return phone;
+    }
+
+    formatCPF(cpf) {
+        if (!cpf) return '';
+        const cleaned = cpf.toString().replace(/\D/g, '');
+        
+        if (cleaned.length === 11) {
+            // CPF: 000.000.000-00
+            return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9)}`;
+        } else if (cleaned.length === 14) {
+            // CNPJ: 00.000.000/0000-00
+            return `${cleaned.slice(0, 2)}.${cleaned.slice(2, 5)}.${cleaned.slice(5, 8)}/${cleaned.slice(8, 12)}-${cleaned.slice(12)}`;
+        }
+        return cpf.toString();
+    }
+
+    formatDate(date) {
+        if (!date) return '';
+        
+        // Se já é uma string formatada em português, retorna como está
+        if (typeof date === 'string' && date.includes('/')) {
+            // Verifica se é uma data válida no formato DD/MM/YYYY
+            const parts = date.split(' ')[0].split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0]);
+                const month = parseInt(parts[1]);
+                const year = parseInt(parts[2]);
+                
+                if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900) {
+                    return parts.join('/');
+                }
+            }
+        }
+        
+        try {
+            // Tenta converter para Date
+            let dateObj;
+            
+            if (typeof date === 'string') {
+                // Se tem formato DD/MM/YYYY HH:MM, extrai só a data
+                if (date.includes('/') && date.includes(' ')) {
+                    const datePart = date.split(' ')[0];
+                    const parts = datePart.split('/');
+                    if (parts.length === 3) {
+                        // Converte DD/MM/YYYY para YYYY-MM-DD para o Date constructor
+                        dateObj = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+                    }
+                } else {
+                    dateObj = new Date(date);
+                }
+            } else {
+                dateObj = new Date(date);
+            }
+            
+            if (isNaN(dateObj.getTime())) {
+                return date.toString();
+            }
+            
+            return dateObj.toLocaleDateString('pt-BR');
+        } catch (error) {
+            console.log('Erro ao formatar data:', date, error);
+            return date.toString();
+        }
+    }
+
+    setupAddDataTab() {
+        // Setup form tabs
+        const formTabButtons = document.querySelectorAll('.form-tab-button');
+        formTabButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const formId = e.target.getAttribute('data-form');
+                this.switchFormTab(formId);
+            });
+        });
+
+        // Setup forms
+        this.setupCustomerForm();
+        this.setupOrderForm();
+        
+        // Set today's date as default for order form
+        const orderDateInput = document.getElementById('orderDate');
+        if (orderDateInput) {
+            orderDateInput.value = new Date().toISOString().split('T')[0];
+        }
+    }
+
+    switchFormTab(formId) {
+        // Update active form tab button
+        document.querySelectorAll('.form-tab-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-form="${formId}"]`).classList.add('active');
+
+        // Update active form content
+        document.querySelectorAll('.form-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(formId).classList.add('active');
+    }
+
+    setupCustomerForm() {
+        const form = document.getElementById('newCustomerForm');
+        if (!form) return;
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleCustomerSubmit(form);
+        });
+
+        // Phone formatting
+        const phoneInput = document.getElementById('customerPhone');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', (e) => {
+                e.target.value = this.formatPhoneInput(e.target.value);
+            });
+        }
+
+        // CPF formatting
+        const cpfInput = document.getElementById('customerCPF');
+        if (cpfInput) {
+            cpfInput.addEventListener('input', (e) => {
+                e.target.value = this.formatCPFInput(e.target.value);
+            });
+        }
+    }
+
+    setupOrderForm() {
+        const form = document.getElementById('newOrderForm');
+        if (!form) return;
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleOrderSubmit(form);
+        });
+
+        // Value formatting
+        const valueInput = document.getElementById('orderValue');
+        if (valueInput) {
+            valueInput.addEventListener('blur', (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) {
+                    e.target.value = value.toFixed(2);
+                }
+            });
+        }
+    }
+
+    handleCustomerSubmit(form) {
+        const formData = new FormData(form);
+        const customerData = {
+            CLIENTE_ID: Date.now(), // Generate unique ID
+            CLIENTE_NOME: formData.get('customerName'),
+            CLIENTE_EMAIL: formData.get('customerEmail'),
+            CLIENTE_TELEFONE_CELULAR: formData.get('customerPhone'),
+            CPF_CNPJ: formData.get('customerCPF'),
+            ENDERECO_RUA: formData.get('customerAddress'),
+            ENDERECO_NUMERO: formData.get('customerNumber'),
+            ENDERECO_CIDADE: formData.get('customerCity'),
+            ENDERECO_ESTADO: formData.get('customerState'),
+            CLIENTE_DATA_CRIACAO: new Date().toLocaleDateString('pt-BR'),
+            PEDIDOS: 0,
+            QTD_APROVADOS: 0,
+            QTD_REPROVADOS: 0,
+            VALOR_PEDIDOS_TOTAL: '0',
+            VALOR_PEDIDOS_APROVADOS: '0',
+            VALOR_PEDIDOS_REPROVADOS: '0'
         };
-        return text.replace(/[&<>"']/g, (m) => map[m]);
+
+        // Check if customer already exists
+        if (this.customerExists(customerData.CLIENTE_EMAIL)) {
+            this.showFormMessage('Já existe um cliente com este email!', 'error');
+            return;
+        }
+
+        // Add to data arrays
+        this.data.customers.push(customerData);
+        this.data.customerStats.push(customerData);
+        this.filteredData.customers.push(customerData);
+        this.filteredData.customerStats.push(customerData);
+
+        // Save to localStorage
+        this.saveDataToLocalStorage();
+
+        // Show success message and reset form
+        this.showFormMessage('Cliente cadastrado com sucesso!', 'success');
+        form.reset();
+
+        // Update displays if on relevant tabs
+        if (this.currentTab === 'customer-summary') {
+            this.renderCustomerSummary();
+        } else if (this.currentTab === 'customer-list') {
+            this.renderCustomerList();
+        }
     }
 
-    logout() {
-        sessionStorage.removeItem('ekobrazil_session');
-        localStorage.removeItem('ekobrazil_remember');
-        window.location.href = 'login.html';
+    handleOrderSubmit(form) {
+        const formData = new FormData(form);
+        const orderData = {
+            CLIENTE_EMAIL: formData.get('orderCustomerEmail'),
+            PEDIDO_NUMERO: formData.get('orderNumber'),
+            PEDIDO_VALOR_TOTAL: parseFloat(formData.get('orderValue')),
+            PEDIDO_SITUACAO: formData.get('orderStatus'),
+            PAGAMENTO_NOME: formData.get('orderPayment'),
+            PEDIDO_DATA_CRIACAO: formData.get('orderDate') ? new Date(formData.get('orderDate')).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'),
+            ENDERECO_ENTREGA_CIDADE: formData.get('orderDeliveryCity'),
+            ENDERECO_ENTREGA_ESTADO: formData.get('orderDeliveryState')
+        };
+
+        // Check if order number already exists
+        if (this.orderExists(orderData.PEDIDO_NUMERO)) {
+            this.showFormMessage('Já existe um pedido com este número!', 'error');
+            return;
+        }
+
+        // Check if customer exists
+        if (!this.customerExists(orderData.CLIENTE_EMAIL)) {
+            this.showFormMessage('Cliente não encontrado! Cadastre o cliente primeiro.', 'error');
+            return;
+        }
+
+        // Add to orders data
+        this.data.orders.push(orderData);
+        this.filteredData.orders.push(orderData);
+
+        // Update customer stats
+        this.updateCustomerStats(orderData);
+
+        // Save to localStorage
+        this.saveDataToLocalStorage();
+
+        // Show success message and reset form
+        this.showFormMessage('Pedido cadastrado com sucesso!', 'success');
+        form.reset();
+
+        // Reset date to today
+        const orderDateInput = document.getElementById('orderDate');
+        if (orderDateInput) {
+            orderDateInput.value = new Date().toISOString().split('T')[0];
+        }
+
+        // Update displays if on relevant tabs
+        if (this.currentTab === 'orders-data') {
+            this.renderOrdersData();
+        } else if (this.currentTab === 'customer-summary') {
+            this.renderCustomerSummary();
+        }
+    }
+
+    customerExists(email) {
+        return this.data.customers.some(customer => customer.CLIENTE_EMAIL === email);
+    }
+
+    orderExists(orderNumber) {
+        return this.data.orders.some(order => order.PEDIDO_NUMERO === orderNumber);
+    }
+
+    updateCustomerStats(orderData) {
+        // Find customer in both arrays and update stats
+        const updateCustomer = (customer) => {
+            if (customer.CLIENTE_EMAIL === orderData.CLIENTE_EMAIL) {
+                customer.PEDIDOS = (parseInt(customer.PEDIDOS) || 0) + 1;
+                
+                const currentTotal = this.parseValue(customer.VALOR_PEDIDOS_TOTAL);
+                const newTotal = currentTotal + orderData.PEDIDO_VALOR_TOTAL;
+                customer.VALOR_PEDIDOS_TOTAL = newTotal.toFixed(2);
+
+                if (orderData.PEDIDO_SITUACAO === 'Aprovado' || orderData.PEDIDO_SITUACAO === 'Pago' || orderData.PEDIDO_SITUACAO === 'Entregue') {
+                    customer.QTD_APROVADOS = (parseInt(customer.QTD_APROVADOS) || 0) + 1;
+                    const currentApproved = this.parseValue(customer.VALOR_PEDIDOS_APROVADOS);
+                    customer.VALOR_PEDIDOS_APROVADOS = (currentApproved + orderData.PEDIDO_VALOR_TOTAL).toFixed(2);
+                } else {
+                    customer.QTD_REPROVADOS = (parseInt(customer.QTD_REPROVADOS) || 0) + 1;
+                    const currentRejected = this.parseValue(customer.VALOR_PEDIDOS_REPROVADOS);
+                    customer.VALOR_PEDIDOS_REPROVADOS = (currentRejected + orderData.PEDIDO_VALOR_TOTAL).toFixed(2);
+                }
+            }
+        };
+
+        this.data.customerStats.forEach(updateCustomer);
+        this.filteredData.customerStats.forEach(updateCustomer);
+    }
+
+    formatPhoneInput(value) {
+        // Remove all non-digits
+        const cleaned = value.replace(/\D/g, '');
+        
+        // Apply phone formatting
+        if (cleaned.length <= 2) {
+            return cleaned;
+        } else if (cleaned.length <= 7) {
+            return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+        } else if (cleaned.length <= 11) {
+            return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+        } else {
+            return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7, 11)}`;
+        }
+    }
+
+    formatCPFInput(value) {
+        // Remove all non-digits
+        const cleaned = value.replace(/\D/g, '');
+        
+        // Apply CPF or CNPJ formatting
+        if (cleaned.length <= 11) {
+            // CPF formatting
+            if (cleaned.length <= 3) {
+                return cleaned;
+            } else if (cleaned.length <= 6) {
+                return `${cleaned.slice(0, 3)}.${cleaned.slice(3)}`;
+            } else if (cleaned.length <= 9) {
+                return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6)}`;
+            } else {
+                return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9)}`;
+            }
+        } else {
+            // CNPJ formatting
+            if (cleaned.length <= 2) {
+                return cleaned;
+            } else if (cleaned.length <= 5) {
+                return `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
+            } else if (cleaned.length <= 8) {
+                return `${cleaned.slice(0, 2)}.${cleaned.slice(2, 5)}.${cleaned.slice(5)}`;
+            } else if (cleaned.length <= 12) {
+                return `${cleaned.slice(0, 2)}.${cleaned.slice(2, 5)}.${cleaned.slice(5, 8)}/${cleaned.slice(8)}`;
+            } else {
+                return `${cleaned.slice(0, 2)}.${cleaned.slice(2, 5)}.${cleaned.slice(5, 8)}/${cleaned.slice(8, 12)}-${cleaned.slice(12, 14)}`;
+            }
+        }
+    }
+
+    showFormMessage(message, type) {
+        const messagesContainer = document.getElementById('formMessages');
+        if (!messagesContainer) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = type === 'success' ? 'success-message' : 'error-message';
+        messageDiv.innerHTML = `
+            <strong>${type === 'success' ? '✅ Sucesso!' : '❌ Erro!'}</strong><br>
+            ${message}
+        `;
+
+        messagesContainer.innerHTML = '';
+        messagesContainer.appendChild(messageDiv);
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            messageDiv.style.opacity = '0';
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 300);
+        }, 5000);
+    }
+
+    saveDataToLocalStorage() {
+        try {
+            localStorage.setItem('ekobrazil_customers', JSON.stringify(this.data.customers));
+            localStorage.setItem('ekobrazil_customer_stats', JSON.stringify(this.data.customerStats));
+            localStorage.setItem('ekobrazil_orders', JSON.stringify(this.data.orders));
+        } catch (error) {
+            console.error('Erro ao salvar dados:', error);
+        }
+    }
+
+    loadDataFromLocalStorage() {
+        try {
+            const savedCustomers = localStorage.getItem('ekobrazil_customers');
+            const savedCustomerStats = localStorage.getItem('ekobrazil_customer_stats');
+            const savedOrders = localStorage.getItem('ekobrazil_orders');
+
+            if (savedCustomers) {
+                const parsedCustomers = JSON.parse(savedCustomers);
+                // Merge with existing data, avoiding duplicates
+                parsedCustomers.forEach(savedCustomer => {
+                    if (!this.data.customers.some(c => c.CLIENTE_EMAIL === savedCustomer.CLIENTE_EMAIL)) {
+                        this.data.customers.push(savedCustomer);
+                    }
+                });
+            }
+
+            if (savedCustomerStats) {
+                const parsedStats = JSON.parse(savedCustomerStats);
+                parsedStats.forEach(savedStat => {
+                    if (!this.data.customerStats.some(c => c.CLIENTE_EMAIL === savedStat.CLIENTE_EMAIL)) {
+                        this.data.customerStats.push(savedStat);
+                    }
+                });
+            }
+
+            if (savedOrders) {
+                const parsedOrders = JSON.parse(savedOrders);
+                parsedOrders.forEach(savedOrder => {
+                    if (!this.data.orders.some(o => o.PEDIDO_NUMERO === savedOrder.PEDIDO_NUMERO)) {
+                        this.data.orders.push(savedOrder);
+                    }
+                });
+            }
+
+            // Update filtered data
+            this.filteredData = {...this.data};
+
+        } catch (error) {
+            console.error('Erro ao carregar dados salvos:', error);
+        }
     }
 }
 
-// Função para inicializar o sistema
-function initEkobrazilSystem() {
-    // Prevenir múltiplas inicializações
-    if (window.EkobrazilSystemInstance) {
-        console.log('Sistema já inicializado, ignorando...');
-        return;
-    }
-    
-    console.log('Tentando inicializar EkobrazilSystem...');
-    try {
-        new EkobrazilSystem();
-    } catch (error) {
-        console.error('Erro ao inicializar sistema:', error);
-    }
-}
-
-// Inicializar sistema quando DOM estiver pronto
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initEkobrazilSystem);
-} else {
-    initEkobrazilSystem();
-}
+// Aguardar carregamento do DOM
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM carregado, inicializando EkobrazilSystem...');
+    window.ekobrazilSystem = new EkobrazilIntegratedSystem();
+});
