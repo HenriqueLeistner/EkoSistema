@@ -92,8 +92,6 @@ class EkobrazilIntegratedSystem {
         const tabButtons = document.querySelectorAll('.tab-button');
         tabButtons.forEach(button => {
             button.addEventListener('click', (e) => {
-                e.preventDefault(); // Evita o comportamento padrão
-                e.stopPropagation(); // Para a propagação do evento
                 const tabId = e.target.getAttribute('data-tab');
                 this.switchTab(tabId);
             });
@@ -115,6 +113,14 @@ class EkobrazilIntegratedSystem {
         if (downloadBtn) {
             downloadBtn.addEventListener('click', () => {
                 this.downloadCurrentData();
+            });
+        }
+        
+        // PDF Download button
+        const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+        if (downloadPdfBtn) {
+            downloadPdfBtn.addEventListener('click', () => {
+                this.handlePDFDownload();
             });
         }
 
@@ -313,38 +319,20 @@ class EkobrazilIntegratedSystem {
     }
 
     switchTab(tabId) {
-        // Prevent switching if already on the same tab
-        if (this.currentTab === tabId) return;
-
-        // Store current scroll position
-        const currentScrollY = window.scrollY;
-
         // Update active tab button
         document.querySelectorAll('.tab-button').forEach(btn => {
             btn.classList.remove('active');
         });
-        const activeButton = document.querySelector(`[data-tab="${tabId}"]`);
-        if (activeButton) {
-            activeButton.classList.add('active');
-        }
+        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
 
-        // Hide all tab content
+        // Update active tab content
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
         });
+        document.getElementById(tabId).classList.add('active');
 
-        // Show new tab content with animation
-        const newContent = document.getElementById(tabId);
-        if (newContent) {
-            setTimeout(() => {
-                newContent.classList.add('active');
-                this.currentTab = tabId;
-                this.updateCurrentTab();
-                
-                // Restore scroll position
-                window.scrollTo(0, currentScrollY);
-            }, 50);
-        }
+        this.currentTab = tabId;
+        this.updateCurrentTab();
     }
 
     updateCurrentTab() {
@@ -494,28 +482,23 @@ class EkobrazilIntegratedSystem {
     renderPeriodAnalysis() {
         const filteredOrders = this.getOrdersInPeriod();
         
-        // Enrich orders with customer data (phone numbers)
-        const enrichedOrders = this.enrichOrdersWithCustomerData(filteredOrders);
-        
         // Update period metrics
-        const totalValue = enrichedOrders.reduce((sum, o) => sum + this.parseValue(o.PEDIDO_VALOR_TOTAL), 0);
-        const approvedOrders = enrichedOrders.filter(o => o.PEDIDO_SITUACAO && o.PEDIDO_SITUACAO.toLowerCase().includes('aprovado')).length;
-        const avgValue = enrichedOrders.length > 0 ? totalValue / enrichedOrders.length : 0;
+        const totalValue = filteredOrders.reduce((sum, o) => sum + this.parseValue(o.PEDIDO_VALOR_TOTAL), 0);
+        const approvedOrders = filteredOrders.filter(o => o.PEDIDO_SITUACAO && o.PEDIDO_SITUACAO.toLowerCase().includes('aprovado')).length;
+        const avgValue = filteredOrders.length > 0 ? totalValue / filteredOrders.length : 0;
 
-        this.updateElement('periodOrdersMetric', enrichedOrders.length);
+        this.updateElement('periodOrdersMetric', filteredOrders.length);
         this.updateElement('periodValueMetric', this.formatCurrency(totalValue));
         this.updateElement('periodApprovedMetric', approvedOrders);
         this.updateElement('periodAvgMetric', this.formatCurrency(avgValue));
 
         // Daily orders chart
-        this.renderDailyChart(enrichedOrders);
+        this.renderDailyChart(filteredOrders);
 
-        // Orders table with phone and WhatsApp
-        this.renderTable('periodOrdersTable', enrichedOrders, [
+        // Orders table
+        this.renderTable('periodOrdersTable', filteredOrders, [
             { key: 'PEDIDO_DATA_CRIACAO', title: 'Data', formatter: this.formatDate },
             { key: 'CLIENTE_EMAIL', title: 'Email' },
-            { key: 'CLIENTE_TELEFONE_CELULAR', title: 'Telefone', formatter: this.formatPhone },
-            { key: 'WHATSAPP_BUTTON', title: 'WhatsApp', formatter: this.formatWhatsAppButton },
             { key: 'PEDIDO_NUMERO', title: 'Número' },
             { key: 'PEDIDO_SITUACAO', title: 'Status' },
             { key: 'PEDIDO_VALOR_TOTAL', title: 'Valor', formatter: this.formatCurrency },
@@ -716,12 +699,7 @@ class EkobrazilIntegratedSystem {
                 if (col.formatter) {
                     value = col.formatter.call(this, value, row);
                 }
-                // Use innerHTML for HTML content (like WhatsApp buttons), textContent for text
-                if (col.key === 'WHATSAPP_BUTTON' || (col.formatter && col.formatter.name === 'formatWhatsAppButton')) {
-                    td.innerHTML = value || '';
-                } else {
-                    td.textContent = value || '';
-                }
+                td.textContent = value || '';
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
@@ -841,6 +819,307 @@ class EkobrazilIntegratedSystem {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    exportToPDF(data, filename, title = 'Relatório Ekobrazil') {
+        if (!data || data.length === 0) {
+            this.showNotification('Nenhum dado para exportar', 'error');
+            return;
+        }
+
+        // Check if jsPDF is loaded
+        if (!window.jspdf) {
+            this.showNotification('Erro: Biblioteca PDF não carregada', 'error');
+            return;
+        }
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Optimize columns based on current tab
+            const optimizedData = this.getOptimizedTableData(data);
+            
+            // Header
+            doc.setFontSize(16);
+            doc.setTextColor(40, 40, 40);
+            doc.text(title, 20, 20);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text('🌿 Ekobrazil - Inteligência Ecológica', 20, 28);
+            doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 20, 35);
+
+            // Configure table
+            doc.autoTable({
+                head: [optimizedData.headers],
+                body: optimizedData.rows,
+                startY: 45,
+                theme: 'striped',
+                styles: {
+                    fontSize: 7,
+                    cellPadding: 2,
+                    overflow: 'ellipsis',
+                    halign: 'left',
+                    valign: 'middle'
+                },
+                headStyles: {
+                    fillColor: [155, 197, 61], // Ekobrazil green
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    fontSize: 8,
+                    halign: 'center'
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 252, 244] // Light green
+                },
+                columnStyles: optimizedData.columnStyles,
+                margin: { top: 45, left: 15, right: 15, bottom: 25 },
+                tableWidth: 'auto',
+                showHead: 'everyPage',
+                didDrawPage: (hookData) => {
+                    // Header on every page
+                    if (hookData.pageNumber > 1) {
+                        doc.setFontSize(10);
+                        doc.setTextColor(100, 100, 100);
+                        doc.text(title, 20, 15);
+                    }
+                    
+                    // Footer
+                    doc.setFontSize(8);
+                    doc.setTextColor(128, 128, 128);
+                    const pageWidth = doc.internal.pageSize.width;
+                    const pageHeight = doc.internal.pageSize.height;
+                    
+                    doc.text(`Página ${hookData.pageNumber}`, 20, pageHeight - 10);
+                    doc.text(`Total de registros: ${data.length}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+                    doc.text('Sistema Ekobrazil', pageWidth - 20, pageHeight - 10, { align: 'right' });
+                }
+            });
+
+            // Save the PDF
+            doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`);
+            
+            // Show success message
+            this.showNotification('PDF exportado com sucesso!', 'success');
+            
+        } catch (error) {
+            console.error('Erro ao exportar PDF:', error);
+            this.showNotification('Erro ao exportar PDF: ' + error.message, 'error');
+        }
+    }
+
+    getOptimizedTableData(data) {
+        if (!data || data.length === 0) return { headers: [], rows: [], columnStyles: {} };
+
+        const allHeaders = Object.keys(data[0]);
+        let selectedColumns, columnStyles;
+
+        // Optimize columns based on current tab
+        switch (this.currentTab) {
+            case 'customer-summary':
+                selectedColumns = [
+                    'CLIENTE_NOME',
+                    'CLIENTE_EMAIL', 
+                    'CLIENTE_TELEFONE_CELULAR',
+                    'PEDIDOS',
+                    'QTD_APROVADOS',
+                    'VALOR_PEDIDOS_TOTAL',
+                    'ENDERECO_CIDADE',
+                    'ENDERECO_ESTADO'
+                ];
+                columnStyles = {
+                    0: { cellWidth: 35 }, // Nome
+                    1: { cellWidth: 40 }, // Email
+                    2: { cellWidth: 25 }, // Telefone
+                    3: { cellWidth: 15 }, // Pedidos
+                    4: { cellWidth: 15 }, // Aprovados
+                    5: { cellWidth: 25 }, // Valor
+                    6: { cellWidth: 20 }, // Cidade
+                    7: { cellWidth: 10 }  // Estado
+                };
+                break;
+                
+            case 'orders-data':
+                selectedColumns = [
+                    'CLIENTE_EMAIL',
+                    'PEDIDO_NUMERO',
+                    'PEDIDO_SITUACAO',
+                    'PEDIDO_VALOR_TOTAL',
+                    'PEDIDO_DATA_CRIACAO',
+                    'ENDERECO_ENTREGA_CIDADE',
+                    'ENDERECO_ENTREGA_ESTADO'
+                ];
+                columnStyles = {
+                    0: { cellWidth: 45 }, // Email
+                    1: { cellWidth: 25 }, // Número
+                    2: { cellWidth: 30 }, // Status
+                    3: { cellWidth: 25 }, // Valor
+                    4: { cellWidth: 25 }, // Data
+                    5: { cellWidth: 25 }, // Cidade
+                    6: { cellWidth: 10 }  // Estado
+                };
+                break;
+                
+            case 'customer-list':
+                selectedColumns = [
+                    'CLIENTE_NOME',
+                    'CLIENTE_EMAIL',
+                    'CLIENTE_TELEFONE_CELULAR',
+                    'CLIENTE_DATA_CRIACAO'
+                ];
+                columnStyles = {
+                    0: { cellWidth: 50 }, // Nome
+                    1: { cellWidth: 60 }, // Email
+                    2: { cellWidth: 30 }, // Telefone
+                    3: { cellWidth: 25 }  // Data
+                };
+                break;
+                
+            default:
+                // Use first 6 columns for other cases
+                selectedColumns = allHeaders.slice(0, 6);
+                columnStyles = {};
+        }
+
+        // Filter columns that exist in data
+        const existingColumns = selectedColumns.filter(col => allHeaders.includes(col));
+        
+        // Translate headers
+        const translatedHeaders = existingColumns.map(header => {
+            const translations = {
+                'CLIENTE_NOME': 'Nome',
+                'CLIENTE_EMAIL': 'Email',
+                'CLIENTE_TELEFONE_CELULAR': 'Telefone',
+                'PEDIDOS': 'Pedidos',
+                'QTD_APROVADOS': 'Aprovados',
+                'VALOR_PEDIDOS_TOTAL': 'Valor Total',
+                'ENDERECO_CIDADE': 'Cidade',
+                'ENDERECO_ESTADO': 'Estado',
+                'PEDIDO_NUMERO': 'Nº Pedido',
+                'PEDIDO_SITUACAO': 'Status',
+                'PEDIDO_VALOR_TOTAL': 'Valor',
+                'PEDIDO_DATA_CRIACAO': 'Data',
+                'PAGAMENTO_NOME': 'Pagamento',
+                'ENDERECO_ENTREGA_CIDADE': 'Cidade',
+                'ENDERECO_ENTREGA_ESTADO': 'Estado',
+                'CLIENTE_DATA_CRIACAO': 'Data Cadastro'
+            };
+            return translations[header] || header;
+        });
+
+        // Prepare table rows
+        const tableRows = data.map(row => 
+            existingColumns.map(header => {
+                let value = row[header] || '';
+                
+                // Format specific fields
+                if (header.includes('TELEFONE') || header.includes('CELULAR')) {
+                    value = this.formatPhone(value);
+                } else if (header.includes('CPF') || header.includes('CNPJ')) {
+                    value = this.formatCPF(value);
+                } else if (header.includes('DATA')) {
+                    value = this.formatDate(value);
+                } else if (header.includes('VALOR') && typeof value === 'string' && value.includes('R$')) {
+                    // Keep currency formatting
+                } else if (header.includes('VALOR') && (typeof value === 'number' || !isNaN(parseFloat(value)))) {
+                    value = this.formatCurrency(value);
+                }
+                
+                // Limit cell content to avoid overflow
+                const strValue = String(value);
+                return strValue.length > 30 ? strValue.substring(0, 27) + '...' : strValue;
+            })
+        );
+
+        return {
+            headers: translatedHeaders,
+            rows: tableRows,
+            columnStyles: columnStyles
+        };
+    }
+
+    handlePDFDownload() {
+        let data, filename, title;
+        
+        switch (this.currentTab) {
+            case 'orders-data':
+                data = this.filteredData.orders || this.data.orders;
+                filename = 'ekobrazil_pedidos';
+                title = 'Relatório de Pedidos - Ekobrazil';
+                break;
+            case 'customer-list':
+                data = this.filteredData.customers || this.data.customers;
+                filename = 'ekobrazil_clientes_lista';
+                title = 'Lista de Clientes - Ekobrazil';
+                break;
+            case 'sales-analysis':
+                data = this.filteredData.customerStats || this.data.customerStats;
+                filename = 'ekobrazil_analise_vendas';
+                title = 'Análise de Vendas - Ekobrazil';
+                break;
+            case 'customer-recurrence':
+                data = this.filteredData.originalCustomers || this.data.originalCustomers;
+                filename = 'ekobrazil_recorrencia';
+                title = 'Análise de Recorrência - Ekobrazil';
+                break;
+            default:
+                data = this.filteredData.customerStats || this.data.customerStats;
+                filename = 'ekobrazil_resumo_clientes';
+                title = 'Resumo de Clientes - Ekobrazil';
+        }
+
+        this.exportToPDF(data, filename, title);
+    }
+
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        let backgroundColor = '#2196F3'; // info
+        if (type === 'success') backgroundColor = '#4CAF50';
+        if (type === 'error') backgroundColor = '#f44336';
+        if (type === 'warning') backgroundColor = '#ff9800';
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${backgroundColor};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 10000;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            transform: translateX(100%);
+            max-width: 300px;
+            word-wrap: break-word;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        // Animate in
+        setTimeout(() => {
+            notification.style.transform = 'translateX(0)';
+        }, 100);
+
+        // Remove after duration based on type
+        const duration = type === 'error' ? 5000 : 3000;
+        setTimeout(() => {
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, duration);
     }
 
     updateElement(id, value) {
@@ -1505,35 +1784,6 @@ class EkobrazilIntegratedSystem {
         `;
 
         container.innerHTML = tableHTML;
-    }
-
-    enrichOrdersWithCustomerData(orders) {
-        return orders.map(order => {
-            // Find customer data by email
-            const customer = this.findCustomerByEmail(order.CLIENTE_EMAIL);
-            
-            return {
-                ...order,
-                CLIENTE_TELEFONE_CELULAR: customer ? customer.CLIENTE_TELEFONE_CELULAR : null,
-                WHATSAPP_BUTTON: customer ? customer.CLIENTE_TELEFONE_CELULAR : null
-            };
-        });
-    }
-
-    findCustomerByEmail(email) {
-        if (!email) return null;
-        
-        // First try customerStats (has more complete data)
-        let customer = this.data.customerStats?.find(c => c.CLIENTE_EMAIL === email);
-        if (customer) return customer;
-        
-        // Then try customers list
-        customer = this.data.customers?.find(c => c.CLIENTE_EMAIL === email);
-        if (customer) return customer;
-        
-        // Finally try original customers
-        customer = this.data.originalCustomers?.find(c => c.CLIENTE_EMAIL === email);
-        return customer || null;
     }
 
     formatWhatsAppButton(value, row) {

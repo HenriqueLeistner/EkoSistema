@@ -331,12 +331,18 @@
                 </div>
                 <div class="table-controls">
                     <button id="downloadBtn" class="download-btn">🌿 Baixar dados (CSV)</button>
+                    <button id="downloadPdfBtn" class="download-btn pdf-btn">📄 Baixar PDF</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="data.js"></script>
+    
+    <!-- PDF Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    
     <script>
         console.log('Data loaded:', typeof window.ekobrazilData !== 'undefined');
         if (typeof window.ekobrazilData !== 'undefined') {

@@ -4,6 +4,12 @@ import datetime
 from io import StringIO
 import traceback
 import numpy as np
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import io
 
 # Page configuration
 st.set_page_config(
@@ -27,8 +33,8 @@ def load_all_data():
         # Load basic customer data
         data['customers'] = pd.read_excel('CLIENTES_COM_PEDIDO_1755624819038.xlsx')
         
-        # Load detailed orders
-        data['orders'] = pd.read_excel('LISTAR_PEDIDO_1755624819039.xlsx')
+        # Load detailed orders (updated file)
+        data['orders'] = pd.read_excel('LISTAR_PEDIDO_1757014215300.xlsx')
         
         # Load original customer data (for compatibility)
         data['original_customers'] = pd.read_excel('CLIENTES_COM_PEDIDO_1755175187340.xlsx')
@@ -85,6 +91,159 @@ def format_date(date_value):
         return str(date_value)
     except Exception:
         return str(date_value)
+
+def create_pdf_report(df, title="Relatório Ekobrazil"):
+    """Create optimized PDF report from DataFrame"""
+    from reportlab.lib.pagesizes import landscape, A4
+    
+    buffer = io.BytesIO()
+    
+    # Use landscape for tables with many columns
+    pagesize = landscape(A4) if len(df.columns) > 4 else A4
+    
+    # Create PDF document
+    doc = SimpleDocTemplate(buffer, pagesize=pagesize, 
+                           rightMargin=50, leftMargin=50,
+                           topMargin=50, bottomMargin=30)
+    
+    # Get style sheet and create custom styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#7BA428'),
+        spaceAfter=15,
+        alignment=1  # Center alignment
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.grey,
+        spaceAfter=20,
+        alignment=1  # Center alignment
+    )
+    
+    # Build content
+    elements = []
+    
+    # Title and subtitle
+    elements.append(Paragraph(title, title_style))
+    elements.append(Paragraph("🌿 Ekobrazil - Inteligência Ecológica", subtitle_style))
+    elements.append(Paragraph(f"Gerado em: {datetime.datetime.now().strftime('%d/%m/%Y às %H:%M')}", subtitle_style))
+    elements.append(Paragraph(f"Total de registros: {len(df)}", subtitle_style))
+    elements.append(Spacer(1, 20))
+    
+    # Convert DataFrame to table data
+    if not df.empty:
+        # Optimize data for PDF display
+        display_df = df.copy()
+        
+        # Limit columns if too many
+        max_cols = 8 if pagesize == landscape(A4) else 6
+        if len(display_df.columns) > max_cols:
+            display_df = display_df.iloc[:, :max_cols]
+            st.info(f"PDF limitado às primeiras {max_cols} colunas para melhor visualização.")
+        
+        # Prepare data for table
+        data_list = [display_df.columns.tolist()]  # Headers
+        
+        for _, row in display_df.iterrows():
+            row_data = []
+            for i, value in enumerate(row):
+                if pd.isna(value):
+                    row_data.append("")
+                else:
+                    # Format based on column content
+                    str_value = str(value)
+                    
+                    # Limit cell content based on column type
+                    if 'email' in display_df.columns[i].lower():
+                        max_len = 25
+                    elif 'nome' in display_df.columns[i].lower():
+                        max_len = 20
+                    elif 'telefone' in display_df.columns[i].lower():
+                        max_len = 15
+                    elif any(x in display_df.columns[i].lower() for x in ['valor', 'total', 'preco']):
+                        max_len = 12
+                    else:
+                        max_len = 15
+                    
+                    if len(str_value) > max_len:
+                        str_value = str_value[:max_len-3] + "..."
+                    
+                    row_data.append(str_value)
+            data_list.append(row_data)
+        
+        # Calculate column widths dynamically
+        page_width = pagesize[0] - 100  # Account for margins
+        num_cols = len(display_df.columns)
+        
+        # Base column widths
+        if num_cols <= 4:
+            col_widths = [page_width * 0.3, page_width * 0.25, page_width * 0.25, page_width * 0.2][:num_cols]
+        elif num_cols <= 6:
+            col_widths = [page_width / num_cols] * num_cols
+        else:
+            col_widths = [page_width / num_cols * 0.8] * num_cols
+        
+        # Create table with dynamic widths
+        table = Table(data_list, colWidths=col_widths, repeatRows=1)
+        
+        # Table styling
+        table.setStyle(TableStyle([
+            # Header styling
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#9BC53D')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            
+            # Data rows styling
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 1), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+            
+            # Alternate row colors
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fcf4')]),
+            
+            # Left align text columns, right align numbers
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # First column left
+            ('ALIGN', (-2, 1), (-1, -1), 'RIGHT'),  # Last two columns right
+        ]))
+        
+        elements.append(table)
+        
+        # Add summary if data exists
+        if len(df) > 50:
+            elements.append(Spacer(1, 20))
+            summary_text = f"Relatório contém {len(df)} registros. Mostrando dados principais para visualização otimizada."
+            elements.append(Paragraph(summary_text, styles['Normal']))
+            
+    else:
+        elements.append(Paragraph("Nenhum dado disponível para exibir.", styles['Normal']))
+    
+    # Add page footer template
+    def add_page_number(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 8)
+        page_num = canvas.getPageNumber()
+        text = f"Página {page_num} - Sistema Ekobrazil"
+        canvas.drawRightString(pagesize[0] - 50, 20, text)
+        canvas.restoreState()
+    
+    # Build PDF with page numbers
+    doc.build(elements, onFirstPage=add_page_number, onLaterPages=add_page_number)
+    
+    buffer.seek(0)
+    return buffer.getvalue()
 
 def main():
     # Custom CSS for styling
@@ -290,14 +449,26 @@ def show_customer_summary(df):
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
-        # Download button
-        csv = display_df.to_csv(index=False, encoding='utf-8-sig')
-        st.download_button(
-            label="🌿 Baixar dados de clientes (CSV)",
-            data=csv,
-            file_name=f"ekobrazil_clientes_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
+        # Download buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            csv = display_df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                label="🌿 Baixar CSV",
+                data=csv,
+                file_name=f"ekobrazil_clientes_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        with col2:
+            pdf_data = create_pdf_report(display_df, "Resumo de Clientes - Ekobrazil")
+            st.download_button(
+                label="📄 Baixar PDF",
+                data=pdf_data,
+                file_name=f"ekobrazil_clientes_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
 
 def show_orders_data(df):
     """Show orders data with filters"""
@@ -384,14 +555,26 @@ def show_orders_data(df):
         
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         
-        # Download button
-        csv = display_df.to_csv(index=False, encoding='utf-8-sig')
-        st.download_button(
-            label="🌿 Baixar dados de pedidos (CSV)",
-            data=csv,
-            file_name=f"ekobrazil_pedidos_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
+        # Download buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            csv = display_df.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                label="🌿 Baixar CSV",
+                data=csv,
+                file_name=f"ekobrazil_pedidos_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        with col2:
+            pdf_data = create_pdf_report(display_df, "Dados de Pedidos - Ekobrazil")
+            st.download_button(
+                label="📄 Baixar PDF",
+                data=pdf_data,
+                file_name=f"ekobrazil_pedidos_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
 
 def show_customer_list(df):
     """Show simple customer list"""

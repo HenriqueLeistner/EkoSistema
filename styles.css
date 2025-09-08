@@ -96,25 +96,8 @@ body {
     cursor: pointer;
     font-weight: 600;
     color: #555;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
     border-bottom: 3px solid transparent;
-    position: relative;
-    overflow: hidden;
-}
-
-.tab-button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(155, 197, 61, 0.2), transparent);
-    transition: left 0.6s ease;
-}
-
-.tab-button:hover::before {
-    left: 100%;
 }
 
 .tab-button:hover {
@@ -131,69 +114,10 @@ body {
 .tab-content {
     display: none;
     margin-top: 2rem;
-    opacity: 0;
-    transform: translateY(15px);
-    transition: all 0.3s ease-in-out;
 }
 
 .tab-content.active {
     display: block;
-    opacity: 1;
-    transform: translateY(0);
-    animation: fadeInUp 0.4s ease-out;
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Smooth page transitions */
-.page-transition {
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.fade-enter {
-    opacity: 0;
-    transform: translateY(30px) scale(0.95);
-}
-
-.fade-enter-active {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-}
-
-.fade-exit {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-}
-
-.fade-exit-active {
-    opacity: 0;
-    transform: translateY(-20px) scale(1.05);
-}
-
-/* Loading animation for content */
-.content-loading {
-    opacity: 0.6;
-    transform: scale(0.98);
-    transition: all 0.3s ease;
-}
-
-.content-loaded {
-    opacity: 1;
-    transform: scale(1);
-}
-
-/* Prevent automatic scrolling */
-html {
-    scroll-behavior: auto !important;
 }
 
 /* Analysis sections */
@@ -653,6 +577,7 @@ html {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-left: 10px;
 }
 
 .download-btn:hover {
@@ -662,6 +587,14 @@ html {
 
 .download-btn:active {
     transform: translateY(0);
+}
+
+.pdf-btn {
+    background: linear-gradient(135deg, #7BA428 0%, #6b912b 100%);
+}
+
+.pdf-btn:hover {
+    background: linear-gradient(135deg, #6b912b 0%, #5c7d24 100%);
 }
 
 /* User info and logout */
