@@ -495,15 +495,8 @@ class EkobrazilIntegratedSystem {
         // Daily orders chart
         this.renderDailyChart(filteredOrders);
 
-        // Orders table
-        this.renderTable('periodOrdersTable', filteredOrders, [
-            { key: 'PEDIDO_DATA_CRIACAO', title: 'Data', formatter: this.formatDate },
-            { key: 'CLIENTE_EMAIL', title: 'Email' },
-            { key: 'PEDIDO_NUMERO', title: 'Número' },
-            { key: 'PEDIDO_SITUACAO', title: 'Status' },
-            { key: 'PEDIDO_VALOR_TOTAL', title: 'Valor', formatter: this.formatCurrency },
-            { key: 'ENDERECO_ENTREGA_CIDADE', title: 'Cidade' }
-        ]);
+        // Orders table with WhatsApp functionality
+        this.renderPeriodOrdersTable(filteredOrders);
     }
 
     setDefaultDates() {
@@ -708,6 +701,78 @@ class EkobrazilIntegratedSystem {
 
         container.innerHTML = '';
         container.appendChild(table);
+    }
+
+    renderPeriodOrdersTable(data) {
+        const container = document.getElementById('periodOrdersTable');
+        if (!container) return;
+
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p class="no-data">Nenhum pedido encontrado no período selecionado.</p>';
+            return;
+        }
+
+        // Buscar dados do cliente para cada pedido para obter o telefone
+        const ordersWithCustomerData = data.map(order => {
+            // Buscar o cliente correspondente pelo email
+            const customer = this.data.customerStats?.find(c => 
+                c.CLIENTE_EMAIL === order.CLIENTE_EMAIL
+            ) || this.data.customers?.find(c => 
+                c.CLIENTE_EMAIL === order.CLIENTE_EMAIL
+            );
+            
+            return {
+                ...order,
+                CLIENTE_TELEFONE_CELULAR: customer ? customer.CLIENTE_TELEFONE_CELULAR : null
+            };
+        });
+
+        const headers = [
+            'Data', 'Email', 'Número', 'Status', 'Valor', 'Cidade', 'WhatsApp'
+        ];
+
+        let tableHTML = `
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        ordersWithCustomerData.forEach(order => {
+            const formattedDate = this.formatDate(order.PEDIDO_DATA_CRIACAO);
+            const formattedValue = this.formatCurrency(order.PEDIDO_VALOR_TOTAL);
+            
+            // Preparar número para WhatsApp (apenas dígitos)
+            const phoneNumber = order.CLIENTE_TELEFONE_CELULAR;
+            const whatsappNumber = phoneNumber ? phoneNumber.toString().replace(/\D/g, '') : '';
+            const whatsappButton = whatsappNumber ? 
+                `<button class="whatsapp-btn" onclick="window.open('https://wa.me/55${whatsappNumber}', '_blank')" title="Enviar mensagem no WhatsApp">
+                    📱 WhatsApp
+                </button>` : 
+                '<span class="no-phone">-</span>';
+
+            tableHTML += `
+                <tr>
+                    <td>${formattedDate}</td>
+                    <td>${order.CLIENTE_EMAIL || ''}</td>
+                    <td>${order.PEDIDO_NUMERO || ''}</td>
+                    <td>${order.PEDIDO_SITUACAO || ''}</td>
+                    <td>${formattedValue}</td>
+                    <td>${order.ENDERECO_ENTREGA_CIDADE || ''}</td>
+                    <td>${whatsappButton}</td>
+                </tr>
+            `;
+        });
+
+        tableHTML += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        container.innerHTML = tableHTML;
     }
 
     filterCustomerStats() {
