@@ -8,11 +8,7 @@ class EkobrazilAuth {
         }
 
         this.users = {
-            'admin': 'ekobrazil123',
-            'gerente': 'verde2024',
-            'vendas': 'cliente123',
-            'ekobrazil': 'inteligencia2024',
-            'daniela': 'eko@eko'
+            'login': 'password',
         };
 
         this.sessionTimeout = 8 * 60 * 60 * 1000; // 8 horas
