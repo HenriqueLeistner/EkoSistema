@@ -6,11 +6,8 @@
 
 | Usuário    | Senha            | Nível de Acesso |
 |------------|------------------|-----------------|
-| `admin`    | `ekobrazil123`   | Administrador   |
-| `gerente`  | `verde2024`      | Gerente         |
-| `vendas`   | `cliente123`     | Vendas          |
-| `ekobrazil`| `inteligencia2024` | Master        |
-| `daniela`  | `eko@eko`        | Usuário         |
+| `login`    | `password`       | Administrador   |
+
 
 ## 🌟 Funcionalidades de Segurança
 
